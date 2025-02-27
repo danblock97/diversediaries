@@ -1,4 +1,4 @@
-// app/dashboard/new/page.jsx
+// app/dashboard/new/PostDetail.jsx
 "use client";
 
 import { useState, useEffect } from "react";

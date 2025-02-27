@@ -1,4 +1,4 @@
-// app/dashboard/page.jsx
+// app/dashboard/PostDetail.jsx
 "use client";
 
 import Image from "next/image";

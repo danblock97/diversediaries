@@ -13,6 +13,8 @@ export default function PostDetail({ id }) {
     const [newComment, setNewComment] = useState('');
     const [commentLoading, setCommentLoading] = useState(false);
     const [readTime, setReadTime] = useState("5 min");
+    const [replyingTo, setReplyingTo] = useState(null);
+    const [commentThreads, setCommentThreads] = useState({});
 
     // Fetch post data with fixed field names
     useEffect(() => {
@@ -100,10 +102,9 @@ export default function PostDetail({ id }) {
         fetchPost();
     }, [id, user]);
 
-    // Fetch comments (code remains the same)
+    // Fetch comments
     useEffect(() => {
         async function fetchComments() {
-            // Same code as before
             if (!id) return;
 
             try {
@@ -136,9 +137,36 @@ export default function PostDetail({ id }) {
                         } : null
                     }));
 
-                    setComments(commentsWithProfiles);
+                    // Organize comments into threads
+                    const threads = {};
+                    commentsWithProfiles.forEach(comment => {
+                        if (!comment.parent_comment_id) {
+                            // This is a top-level comment
+                            if (!threads[comment.id]) {
+                                threads[comment.id] = {
+                                    comment,
+                                    replies: []
+                                };
+                            } else {
+                                threads[comment.id].comment = comment;
+                            }
+                        } else {
+                            // This is a reply
+                            if (!threads[comment.parent_comment_id]) {
+                                threads[comment.parent_comment_id] = {
+                                    replies: [comment]
+                                };
+                            } else {
+                                threads[comment.parent_comment_id].replies.push(comment);
+                            }
+                        }
+                    });
+
+                    setCommentThreads(threads);
+                    setComments(commentsWithProfiles.filter(c => !c.parent_comment_id));
                 } else {
                     setComments([]);
+                    setCommentThreads({});
                 }
             } catch (err) {
                 console.error("Error fetching comments:", err);
@@ -149,7 +177,6 @@ export default function PostDetail({ id }) {
     }, [id, user]);
 
     const handlePostComment = async () => {
-        // Same code as before
         if (!newComment.trim()) return;
         if (!user) {
             alert("Please sign in to comment");
@@ -158,13 +185,20 @@ export default function PostDetail({ id }) {
 
         setCommentLoading(true);
         try {
+            const commentData = {
+                post_id: id,
+                user_id: user.id,
+                content: newComment.trim(),
+            };
+
+            // Add parent_comment_id if replying to a comment
+            if (replyingTo) {
+                commentData.parent_comment_id = replyingTo;
+            }
+
             const { data, error } = await supabase
                 .from("comments")
-                .insert([{
-                    post_id: id,
-                    user_id: user.id,
-                    content: newComment.trim(),
-                }])
+                .insert([commentData])
                 .select();
 
             if (error) throw new Error(error.message);
@@ -175,21 +209,81 @@ export default function PostDetail({ id }) {
                 .eq('id', user.id)
                 .single();
 
-            setComments([{
+            const newCommentObj = {
                 ...data[0],
                 profiles: {
                     ...profileData,
                     username: user.email,
                     avatar_url: profileData?.profile_picture
                 }
-            }, ...comments]);
+            };
+
+            if (replyingTo) {
+                // Add the reply to the thread
+                setCommentThreads(prev => {
+                    const updated = {...prev};
+                    if (!updated[replyingTo]) {
+                        updated[replyingTo] = { replies: [] };
+                    }
+                    updated[replyingTo].replies = [newCommentObj, ...(updated[replyingTo].replies || [])];
+                    return updated;
+                });
+            } else {
+                // Add as a top-level comment
+                setComments(prev => [newCommentObj, ...prev]);
+                setCommentThreads(prev => ({
+                    ...prev,
+                    [newCommentObj.id]: { comment: newCommentObj, replies: [] }
+                }));
+            }
 
             setNewComment('');
+            setReplyingTo(null);
         } catch (err) {
             alert("Failed to post comment. Please try again.");
         } finally {
             setCommentLoading(false);
         }
+    };
+
+    const Comment = ({ comment, isReply = false, onReply }) => {
+        return (
+            <div className={`bg-white rounded-lg ${isReply ? 'border-l-4 border-gray-200 pl-4' : 'shadow-sm'} p-6 mb-4`}>
+                <div className="flex items-start">
+                    <div className="flex-shrink-0 w-10 h-10 bg-gray-300 rounded-full overflow-hidden mr-4">
+                        {comment.profiles?.avatar_url ? (
+                            <img src={comment.profiles.avatar_url} alt="Commenter" className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="h-full w-full flex items-center justify-center bg-gray-200 text-gray-500">
+                                {comment.profiles?.username?.charAt(0)?.toUpperCase() || 'A'}
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex-1">
+                        <div className="flex justify-between items-center mb-2">
+                            <div>
+                                <p className="font-medium text-gray-900">{comment.profiles?.username || 'Anonymous'}</p>
+                                <p className="text-xs text-gray-500">{new Date(comment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                            </div>
+                        </div>
+                        <div className="prose prose-sm max-w-none">
+                            <p className="text-gray-800 whitespace-pre-line">{comment.content}</p>
+                        </div>
+                        <div className="mt-3">
+                            <button
+                                onClick={() => onReply(comment.id)}
+                                className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                                </svg>
+                                Reply
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        );
     };
 
     if (loading) {
@@ -281,16 +375,16 @@ export default function PostDetail({ id }) {
 
                 {/* First paragraph highlight for Medium style */}
                 <script dangerouslySetInnerHTML={{ __html: `
-        document.addEventListener('DOMContentLoaded', () => {
-            const firstP = document.querySelector('.article-content > p:first-of-type');
-            if (firstP) {
-                firstP.classList.add('text-xl', 'font-medium');
-            }
-        });
-    `}} />
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const firstP = document.querySelector('.article-content > p:first-of-type');
+                        if (firstP) {
+                            firstP.classList.add('text-xl', 'font-medium');
+                        }
+                    });
+                `}} />
 
                 <div className="border-t border-gray-200 my-12 pt-8">
-                    {/* Author bio section - stays the same */}
+                    {/* Author bio section */}
                     <div className="flex items-center">
                         <div className="flex-shrink-0 h-16 w-16 bg-gray-300 rounded-full overflow-hidden">
                             {post.profiles?.profile_picture ? (
@@ -310,19 +404,27 @@ export default function PostDetail({ id }) {
             </article>
 
             {/* Comments section */}
-            <section className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-12 bg-gray-50 rounded-lg my-8">
+            <section className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 bg-gray-50 rounded-lg my-8">
                 <h2 className="text-2xl font-bold font-serif mb-8">Comments</h2>
 
                 <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
                     <textarea
-                        placeholder={user ? "Write a comment..." : "Sign in to comment"}
+                        placeholder={replyingTo ? "Write a reply..." : user ? "Write a comment..." : "Sign in to comment"}
                         className="w-full border border-gray-200 p-4 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
                         rows="4"
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
                         disabled={!user}
                     />
-                    <div className="mt-4 flex justify-end">
+                    <div className="mt-4 flex justify-between items-center">
+                        {replyingTo && (
+                            <button
+                                className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                                onClick={() => setReplyingTo(null)}
+                            >
+                                Cancel Reply
+                            </button>
+                        )}
                         <button
                             className={`px-5 py-2 rounded-full font-medium ${
                                 user ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
@@ -330,7 +432,7 @@ export default function PostDetail({ id }) {
                             onClick={handlePostComment}
                             disabled={!user || commentLoading}
                         >
-                            {commentLoading ? 'Posting...' : 'Post Comment'}
+                            {commentLoading ? 'Posting...' : replyingTo ? 'Post Reply' : 'Post Comment'}
                         </button>
                     </div>
                 </div>
@@ -341,26 +443,35 @@ export default function PostDetail({ id }) {
                             <p>No comments yet. Be the first to comment!</p>
                         </div>
                     ) : (
-                        comments.map(comment => (
-                            <div key={comment.id} className="bg-white p-6 rounded-lg shadow-sm">
-                                <p className="text-gray-800 leading-relaxed">{comment.content}</p>
-                                <div className="flex items-center mt-4">
-                                    <div className="flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full overflow-hidden">
-                                        {comment.profiles?.avatar_url ? (
-                                            <img src={comment.profiles.avatar_url} alt="Commenter" className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="h-full w-full flex items-center justify-center bg-gray-200 text-gray-500">
-                                                {comment.profiles?.username?.charAt(0)?.toUpperCase() || 'A'}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="ml-3">
-                                        <p className="text-sm font-medium text-gray-900">{comment.profiles?.username || 'Anonymous'}</p>
-                                        <p className="text-xs text-gray-500">{new Date(comment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                                    </div>
+                        comments.map(comment => {
+                            const thread = commentThreads[comment.id];
+                            return (
+                                <div key={comment.id} className="comment-thread">
+                                    <Comment
+                                        comment={comment}
+                                        onReply={(id) => {
+                                            setReplyingTo(id);
+                                            document.querySelector('textarea').focus();
+                                        }}
+                                    />
+                                    {thread?.replies && thread.replies.length > 0 && (
+                                        <div className="ml-12 mt-2 space-y-4">
+                                            {thread.replies.map((reply, index) => (
+                                                <Comment
+                                                    key={`${reply.id}-${index}`}
+                                                    comment={reply}
+                                                    isReply={true}
+                                                    onReply={(id) => {
+                                                        setReplyingTo(comment.id); // Reply to the parent
+                                                        document.querySelector('textarea').focus();
+                                                    }}
+                                                />
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
-                            </div>
-                        ))
+                            );
+                        })
                     )}
                 </div>
             </section>

@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 const AuthContext = createContext({
     session: null,
     user: null,
+    loading: true,
     signIn: async (email) => {},
     signOut: async () => {},
     setSession: () => {},
@@ -13,45 +14,41 @@ const AuthContext = createContext({
 
 export function AuthProvider({ children }) {
     const [session, setSession] = useState(null);
+    const [loading, setLoading] = useState(true);
 
-    // On component mount, get the current session and listen for auth state changes.
+    // On mount, get the current session and listen for auth state changes.
     useEffect(() => {
         supabase.auth.getSession().then(({ data }) => {
             setSession(data.session);
+            setLoading(false);
         });
 
         const {
             data: { subscription },
         } = supabase.auth.onAuthStateChange((event, session) => {
             setSession(session);
+            setLoading(false);
         });
 
         return () => subscription.unsubscribe();
     }, []);
 
+    // When the session updates (user signs in), check if a profile row exists.
     // When the session updates (user signs in), check if a profile row exists
     useEffect(() => {
         const createProfileIfMissing = async () => {
             if (session?.user) {
-                // Check if profile exists
-                const { data, error } = await supabase
+                // Upsert will insert if missing, or do nothing if already exists
+                const { error } = await supabase
                     .from("profiles")
-                    .select("*")
-                    .eq("id", session.user.id)
-                    .single();
-                if (error || !data) {
-                    // If no profile exists, insert a new row with default values.
-                    const { error: insertError } = await supabase
-                        .from("profiles")
-                        .insert({
-                            id: session.user.id,
-                            bio: "",
-                            profile_picture: "",
-                            preferences: {},
-                        });
-                    if (insertError) {
-                        console.error("Error creating profile:", insertError.message);
-                    }
+                    .upsert({
+                        id: session.user.id,
+                        bio: "",
+                        profile_picture: "",
+                        preferences: {},
+                    });
+                if (error && error.code !== "23505") { // 23505 is the unique violation error code
+                    console.error("Error creating/upserting profile:", error.message);
                 }
             }
         };
@@ -80,9 +77,10 @@ export function AuthProvider({ children }) {
     const value = {
         session,
         user: session?.user,
+        loading,
         signIn,
         signOut,
-        setSession, // Expose setter if needed in auth callback page.
+        setSession,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,8 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AuthModal({ isOpen, onClose }) {
+    const { signIn } = useAuth();
+    const [email, setEmail] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [sent, setSent] = useState(false);
+
+    const handleSubmit = async () => {
+        if (!email) return;
+        setLoading(true);
+        const { error } = await signIn(email);
+        setLoading(false);
+        if (!error) {
+            setSent(true);
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -25,10 +42,16 @@ export default function AuthModal({ isOpen, onClose }) {
                         <input
                             type="email"
                             placeholder="you@example.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             className="w-full border border-gray-300 p-3 rounded-md text-lg mb-4"
                         />
-                        <button className="w-full bg-black text-white px-6 py-3 rounded-full">
-                            Send Magic Link
+                        <button
+                            onClick={handleSubmit}
+                            disabled={loading || sent}
+                            className="w-full bg-black text-white px-6 py-3 rounded-full disabled:opacity-50"
+                        >
+                            {loading ? "Sending..." : sent ? "Link Sent" : "Send Magic Link"}
                         </button>
                     </div>
 

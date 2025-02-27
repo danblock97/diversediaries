@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useAuth } from "@/context/AuthContext";
 import Image from "next/image";
 import { Typewriter } from "react-simple-typewriter";
+import Link from "next/link";
 
 export default function Home() {
-    // For demonstration only:
-    // Switch to `true` to see the “authenticated” feed layout.
-    const [isAuthenticated] = useState(true);
+    const { user } = useAuth();
+    const isAuthenticated = !!user;
 
     if (isAuthenticated) {
         // Authenticated Layout (Feed-like UI)
@@ -15,22 +15,21 @@ export default function Home() {
             <div className="max-w-7xl mx-auto px-4 py-12 h-screen">
                 {/* Top navigation for feed filtering, categories, etc. */}
                 <nav className="flex items-center space-x-4 text-sm text-gray-600 mb-8">
-                    <a href="#" className="font-semibold hover:underline">
+                    <Link href="#" className="font-semibold hover:underline">
                         For you
-                    </a>
-                    <a href="#" className="hover:underline">
+                    </Link>
+                    <Link href="#" className="hover:underline">
                         Following
-                    </a>
-                    <a href="#" className="hover:underline">
+                    </Link>
+                    <Link href="#" className="hover:underline">
                         Featured
-                    </a>
-                    <a href="#" className="hover:underline">
+                    </Link>
+                    <Link href="#" className="hover:underline">
                         Staff Picks
-                    </a>
-                    <a href="#" className="hover:underline">
+                    </Link>
+                    <Link href="#" className="hover:underline">
                         Software Development
-                    </a>
-                    {/* etc... */}
+                    </Link>
                 </nav>
 
                 <div className="flex flex-col md:flex-row gap-8">
@@ -38,9 +37,12 @@ export default function Home() {
                     <div className="md:w-2/3 space-y-8">
                         {/* Sample Post 1 */}
                         <div className="flex flex-col border-b border-gray-200 pb-6">
-                            <p className="text-sm text-gray-500 mb-2">Artificial Intelligence · 5 min read</p>
+                            <p className="text-sm text-gray-500 mb-2">
+                                Artificial Intelligence · 5 min read
+                            </p>
                             <h2 className="text-xl font-semibold mb-2">
-                                You’re Using ChatGPT Wrong! Here’s How to be Ahead of 99% of ChatGPT Users
+                                You’re Using ChatGPT Wrong! Here’s How to be Ahead of 99% of
+                                ChatGPT Users
                             </h2>
                             <p className="text-gray-700 mb-2">
                                 Master ChatGPT by learning prompt engineering...
@@ -50,12 +52,15 @@ export default function Home() {
 
                         {/* Sample Post 2 */}
                         <div className="flex flex-col border-b border-gray-200 pb-6">
-                            <p className="text-sm text-gray-500 mb-2">Dmitri Ivanov · 8 min read</p>
+                            <p className="text-sm text-gray-500 mb-2">
+                                Dmitri Ivanov · 8 min read
+                            </p>
                             <h2 className="text-xl font-semibold mb-2">
                                 How does Single-Sign-On (SSO) work?
                             </h2>
                             <p className="text-gray-700 mb-2">
-                                Single-Sign-On (SSO) is a crucial piece of the modern identity puzzle...
+                                Single-Sign-On (SSO) is a crucial piece of the modern identity
+                                puzzle...
                             </p>
                             <p className="text-sm text-gray-500">Jul 25, 2026</p>
                         </div>
@@ -84,25 +89,25 @@ export default function Home() {
                                 <li className="flex items-start">
                                     <span className="text-gray-600">1.</span>
                                     <div className="ml-2">
-                                        <a href="#" className="text-gray-800 hover:underline">
-                                            First-person perspectives on 3 years of remote
-                                        </a>
+                                        <Link href="#" className="text-gray-800 hover:underline">
+                                                First-person perspectives on 3 years of remote
+                                        </Link>
                                     </div>
                                 </li>
                                 <li className="flex items-start">
                                     <span className="text-gray-600">2.</span>
                                     <div className="ml-2">
-                                        <a href="#" className="text-gray-800 hover:underline">
-                                            Negatives and Negative Capability
-                                        </a>
+                                        <Link href="#" className="text-gray-800 hover:underline">
+                                                Negatives and Negative Capability
+                                        </Link>
                                     </div>
                                 </li>
                                 <li className="flex items-start">
                                     <span className="text-gray-600">3.</span>
                                     <div className="ml-2">
-                                        <a href="#" className="text-gray-800 hover:underline">
-                                            A guide to data inflation while you’re coding
-                                        </a>
+                                        <Link href="#" className="text-gray-800 hover:underline">
+                                                A guide to data inflation while you’re coding
+                                        </Link>
                                     </div>
                                 </li>
                             </ul>
@@ -114,9 +119,9 @@ export default function Home() {
                             <p className="text-sm text-gray-700 mb-4">
                                 Explore how to start writing, gain your audience and more...
                             </p>
-                            <a href="#" className="text-sm text-green-600 hover:underline font-medium">
-                                Get started
-                            </a>
+                            <Link href="#" className="text-sm text-green-600 hover:underline font-medium">
+                                    Get started
+                            </Link>
                         </div>
 
                         {/* Additional recommended topics */}
@@ -126,30 +131,20 @@ export default function Home() {
                             </h3>
                             <ul className="flex flex-wrap gap-2 text-sm">
                                 <li>
-                                    <a
-                                        href="#"
-                                        className="bg-gray-100 px-3 py-1 rounded hover:bg-gray-200"
-                                    >
-                                        Tech
-                                    </a>
+                                    <Link href="#" className="bg-gray-100 px-3 py-1 rounded hover:bg-gray-200">
+                                            Tech
+                                    </Link>
                                 </li>
                                 <li>
-                                    <a
-                                        href="#"
-                                        className="bg-gray-100 px-3 py-1 rounded hover:bg-gray-200"
-                                    >
-                                        AI
-                                    </a>
+                                    <Link href="#" className="bg-gray-100 px-3 py-1 rounded hover:bg-gray-200">
+                                            AI
+                                    </Link>
                                 </li>
                                 <li>
-                                    <a
-                                        href="#"
-                                        className="bg-gray-100 px-3 py-1 rounded hover:bg-gray-200"
-                                    >
-                                        Self Improvement
-                                    </a>
+                                    <Link href="#" className="bg-gray-100 px-3 py-1 rounded hover:bg-gray-200">
+                                            Self Improvement
+                                    </Link>
                                 </li>
-                                {/* etc... */}
                             </ul>
                         </div>
                     </div>
@@ -157,7 +152,7 @@ export default function Home() {
             </div>
         );
     } else {
-        // Non-Authenticated Layout (Your existing hero section)
+        // Non-Authenticated Layout (Hero Section)
         return (
             <section
                 className="

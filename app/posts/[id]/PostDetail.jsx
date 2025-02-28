@@ -102,77 +102,90 @@ export default function PostDetail({ id }) {
         fetchPost();
     }, [id, user]);
 
-    // Fetch comments
-    useEffect(() => {
-        async function fetchComments() {
-            if (!id) return;
+    // Extract fetchComments function outside useEffect
+    const fetchComments = async () => {
+        if (!id) return;
 
-            try {
-                const { data: commentsData, error } = await supabase
-                    .from("comments")
-                    .select('*')
-                    .eq("post_id", id)
-                    .order('created_at', { ascending: false });
+        try {
+            // First fetch just the comments
+            const { data: commentsData, error } = await supabase
+                .from("comments")
+                .select('*')
+                .eq("post_id", id)
+                .order('created_at', { ascending: false });
 
-                if (error) return;
+            if (error) throw new Error(error.message || "Failed to fetch comments");
 
-                if (commentsData && commentsData.length > 0) {
-                    const userIds = [...new Set(commentsData.map(c => c.user_id))];
-                    const { data: profilesData } = await supabase
-                        .from("profiles")
-                        .select('id, bio, profile_picture')
-                        .in('id', userIds);
-
-                    const profileMap = {};
-                    if (profilesData) {
-                        profilesData.forEach(p => profileMap[p.id] = p);
-                    }
-
-                    const commentsWithProfiles = commentsData.map(c => ({
-                        ...c,
-                        profiles: profileMap[c.user_id] ? {
-                            ...profileMap[c.user_id],
-                            username: user && user.id === c.user_id ? user.email : 'Anonymous',
-                            avatar_url: profileMap[c.user_id].profile_picture
-                        } : null
-                    }));
-
-                    // Organize comments into threads
-                    const threads = {};
-                    commentsWithProfiles.forEach(comment => {
-                        if (!comment.parent_comment_id) {
-                            // This is a top-level comment
-                            if (!threads[comment.id]) {
-                                threads[comment.id] = {
-                                    comment,
-                                    replies: []
-                                };
-                            } else {
-                                threads[comment.id].comment = comment;
-                            }
-                        } else {
-                            // This is a reply
-                            if (!threads[comment.parent_comment_id]) {
-                                threads[comment.parent_comment_id] = {
-                                    replies: [comment]
-                                };
-                            } else {
-                                threads[comment.parent_comment_id].replies.push(comment);
-                            }
-                        }
-                    });
-
-                    setCommentThreads(threads);
-                    setComments(commentsWithProfiles.filter(c => !c.parent_comment_id));
-                } else {
-                    setComments([]);
-                    setCommentThreads({});
-                }
-            } catch (err) {
-                console.error("Error fetching comments:", err);
+            if (!commentsData || commentsData.length === 0) {
+                setComments([]);
+                setCommentThreads({});
+                return;
             }
-        }
 
+            // Get user IDs
+            const userIds = [...new Set(commentsData.map(comment => comment.user_id))];
+            let profilesData = {};
+
+            if (userIds.length > 0) {
+                // Get profile information
+                const { data: profiles, error: profilesError } = await supabase
+                    .from("profiles")
+                    .select('id, username, avatar_url')
+                    .in('id', userIds);
+
+                if (!profilesError && profiles) {
+                    profiles.forEach(profile => {
+                        profilesData[profile.id] = profile;
+                    });
+                }
+            }
+
+            // Combine data
+            const commentsWithProfiles = commentsData.map(comment => {
+                // Use the current user's email for their own comments
+                const isCurrentUser = user && user.id === comment.user_id;
+                const emailOrUsername = isCurrentUser ? user.email : null;
+
+                return {
+                    ...comment,
+                    profiles: profilesData[comment.user_id]
+                        ? {
+                            ...profilesData[comment.user_id],
+                            email: emailOrUsername
+                        }
+                        : {
+                            username: emailOrUsername || "Anonymous",
+                            avatar_url: null
+                        }
+                };
+            });
+
+            // Organize comments into threads
+            const threads = {};
+            commentsWithProfiles.forEach(comment => {
+                if (comment.parent_comment_id) {
+                    if (!threads[comment.parent_comment_id]) {
+                        threads[comment.parent_comment_id] = { replies: [] };
+                    }
+                    threads[comment.parent_comment_id].replies.push(comment);
+                } else {
+                    if (!threads[comment.id]) {
+                        threads[comment.id] = { replies: [] };
+                    }
+                }
+            });
+
+            setCommentThreads(threads);
+            setComments(commentsWithProfiles.filter(c => !c.parent_comment_id));
+        } catch (err) {
+            console.error("Error fetching comments:", err.message || JSON.stringify(err));
+            setComments([]);
+            setCommentThreads({});
+        }
+    };
+
+    // Then in your useEffect
+    useEffect(() => {
         fetchComments();
     }, [id, user]);
 
@@ -203,39 +216,9 @@ export default function PostDetail({ id }) {
 
             if (error) throw new Error(error.message);
 
-            const { data: profileData } = await supabase
-                .from("profiles")
-                .select('bio, profile_picture')
-                .eq('id', user.id)
-                .single();
-
-            const newCommentObj = {
-                ...data[0],
-                profiles: {
-                    ...profileData,
-                    username: user.email,
-                    avatar_url: profileData?.profile_picture
-                }
-            };
-
-            if (replyingTo) {
-                // Add the reply to the thread
-                setCommentThreads(prev => {
-                    const updated = {...prev};
-                    if (!updated[replyingTo]) {
-                        updated[replyingTo] = { replies: [] };
-                    }
-                    updated[replyingTo].replies = [newCommentObj, ...(updated[replyingTo].replies || [])];
-                    return updated;
-                });
-            } else {
-                // Add as a top-level comment
-                setComments(prev => [newCommentObj, ...prev]);
-                setCommentThreads(prev => ({
-                    ...prev,
-                    [newCommentObj.id]: { comment: newCommentObj, replies: [] }
-                }));
-            }
+            // Instead of manually updating the comments state,
+            // just refresh comments from the database
+            await fetchComments();
 
             setNewComment('');
             setReplyingTo(null);
@@ -262,7 +245,9 @@ export default function PostDetail({ id }) {
                     <div className="flex-1">
                         <div className="flex justify-between items-center mb-2">
                             <div>
-                                <p className="font-medium text-gray-900">{comment.profiles?.username || 'Anonymous'}</p>
+                                <p className="font-medium text-gray-900">
+                                    {comment.profiles?.username || comment.profiles?.email || 'Anonymous'}
+                                </p>
                                 <p className="text-xs text-gray-500">{new Date(comment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                             </div>
                         </div>

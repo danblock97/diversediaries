@@ -254,7 +254,7 @@ export default function Home() {
   const { user, loading } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState(null);
 
-  if (loading) return <p>Loading...</p>;
+  if (loading) return <p className="text-lg h-screen">Loading...</p>;
   if (!user) return <HeroSection />;
 
   return (

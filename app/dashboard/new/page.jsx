@@ -114,7 +114,7 @@ export default function NewPostPage() {
     <div className="max-w-3xl mx-auto px-4 py-12">
       {loading ? (
         <div className="flex items-center justify-center h-screen">
-          <p className="text-lg">Loading...</p>
+          <p className="text-lg h-screen">Loading...</p>
         </div>
       ) : (
         <>

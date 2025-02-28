@@ -1,7 +1,13 @@
 const Comment = ({ comment, isReply = false, onReply }) => {
+  // Prefer display_name then email; if neither is available, use "Anonymous"
+  const name =
+    comment.profiles?.display_name || comment.profiles?.email || "Anonymous";
+
   return (
     <div
-      className={`bg-white rounded-lg ${isReply ? "border-l-4 border-gray-200 pl-4" : "shadow-sm"} p-6 mb-4`}
+      className={`bg-white rounded-lg ${
+        isReply ? "border-l-4 border-gray-200 pl-4" : "shadow-sm"
+      } p-6 mb-4`}
     >
       <div className="flex items-start">
         <div className="flex-shrink-0 w-10 h-10 bg-gray-300 rounded-full overflow-hidden mr-4">
@@ -13,7 +19,7 @@ const Comment = ({ comment, isReply = false, onReply }) => {
             />
           ) : (
             <div className="h-full w-full flex items-center justify-center bg-gray-200 text-gray-500">
-              {comment.profiles?.username?.charAt(0)?.toUpperCase() || "A"}
+              {name.charAt(0).toUpperCase()}
             </div>
           )}
         </div>
@@ -21,9 +27,7 @@ const Comment = ({ comment, isReply = false, onReply }) => {
         <div className="flex-1">
           <div className="flex justify-between items-center mb-2">
             <div>
-              <p className="font-medium text-gray-900">
-                {comment.profiles?.username || "Anonymous"}
-              </p>
+              <p className="font-medium text-gray-900">{name}</p>
               <p className="text-xs text-gray-500">
                 {new Date(comment.created_at).toLocaleDateString("en-US", {
                   month: "short",
@@ -65,3 +69,5 @@ const Comment = ({ comment, isReply = false, onReply }) => {
     </div>
   );
 };
+
+export default Comment;

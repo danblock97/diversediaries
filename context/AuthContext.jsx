@@ -24,12 +24,10 @@ export function AuthProvider({ children }) {
       try {
         const { data, error } = await supabase.auth.getSession();
         if (error) throw error;
-
         setSession(data.session);
       } catch (err) {
         console.error("Auth session error:", err.message);
         setError(err);
-        // Clear any existing session data if there's an error
         setSession(null);
       } finally {
         setLoading(false);
@@ -44,12 +42,9 @@ export function AuthProvider({ children }) {
       console.log("Auth state change:", event);
       setSession(newSession);
       setLoading(false);
-
       if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") {
-        // Reset any errors when successfully authenticated
         setError(null);
       }
-
       if (event === "SIGNED_OUT" || event === "USER_DELETED") {
         setSession(null);
       }
@@ -58,16 +53,21 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Profile creation logic (unchanged)
+  // Profile creation logic using auth metadata for display_name and email.
   useEffect(() => {
     const createProfileIfMissing = async () => {
       if (session?.user) {
         try {
+          const { user } = session;
+          // Use the full name from user_metadata if available, otherwise fallback to email.
+          const display_name = user.user_metadata?.full_name || user.email;
           const { error } = await supabase.from("profiles").upsert({
-            id: session.user.id,
+            id: user.id,
             bio: "",
             profile_picture: "",
             preferences: {},
+            display_name, // New display_name field.
+            email: user.email, // New email field.
           });
           if (error && error.code !== "23505") {
             console.error("Error creating/upserting profile:", error.message);

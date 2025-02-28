@@ -1,4 +1,3 @@
-// app/dashboard/new/PostDetail.jsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -6,7 +5,6 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
-import FeedbackModal from "@/components/FeedbackModal";
 
 // Dynamically import TipTap to avoid SSR issues
 const TiptapEditor = dynamic(() => import("@/components/TiptapEditor"), {
@@ -25,8 +23,6 @@ export default function NewPostPage() {
     const [selectedCategories, setSelectedCategories] = useState([]);
     const [loadingPost, setLoadingPost] = useState(false);
     const [error, setError] = useState("");
-    const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
-    const [newPostId, setNewPostId] = useState(null);
 
     // Always fetch categories regardless.
     useEffect(() => {
@@ -84,7 +80,6 @@ export default function NewPostPage() {
         }
 
         const newPost = postData[0];
-        setNewPostId(newPost.id);
 
         // Insert into the post_categories table.
         const insertPromises = selectedCategories.map((categoryId) =>
@@ -98,21 +93,14 @@ export default function NewPostPage() {
             return;
         }
 
-        // Check if "Other" category is selected.
+        // Determine if "Other" category is selected.
         const otherCategory = categories.find((cat) => cat.name.toLowerCase() === "other");
-        if (otherCategory && selectedCategories.includes(otherCategory.id)) {
-            setFeedbackModalOpen(true);
-        } else {
-            router.push(`/posts/${newPost.id}`);
-        }
+        const queryParam = (otherCategory && selectedCategories.includes(otherCategory.id)) ? "?feedback=true" : "";
+
+        router.push(`/posts/${newPost.id}${queryParam}`);
         setLoadingPost(false);
     };
 
-    const handleFeedbackSubmitted = () => {
-        router.push(`/posts/${newPostId}`);
-    };
-
-    // Render the same hook structure and conditionally show content.
     return (
         <div className="max-w-3xl mx-auto px-4 py-12">
             {loading ? (
@@ -171,13 +159,6 @@ export default function NewPostPage() {
                             {loadingPost ? "Publishing..." : "Publish"}
                         </button>
                     </form>
-
-                    {/* Feedback Modal for "Other" Category */}
-                    <FeedbackModal
-                        isOpen={feedbackModalOpen}
-                        onClose={() => setFeedbackModalOpen(false)}
-                        onFeedbackSubmitted={handleFeedbackSubmitted}
-                    />
                 </>
             )}
         </div>

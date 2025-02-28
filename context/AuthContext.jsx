@@ -7,6 +7,7 @@ const AuthContext = createContext({
     session: null,
     user: null,
     loading: true,
+    error: null,
     signIn: async (email) => {},
     signOut: async () => {},
     setSession: () => {},
@@ -15,40 +16,66 @@ const AuthContext = createContext({
 export function AuthProvider({ children }) {
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     // On mount, get the current session and listen for auth state changes.
     useEffect(() => {
-        supabase.auth.getSession().then(({ data }) => {
-            setSession(data.session);
-            setLoading(false);
-        });
+        const fetchSession = async () => {
+            try {
+                const { data, error } = await supabase.auth.getSession();
+                if (error) throw error;
+
+                setSession(data.session);
+            } catch (err) {
+                console.error("Auth session error:", err.message);
+                setError(err);
+                // Clear any existing session data if there's an error
+                setSession(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchSession();
 
         const {
             data: { subscription },
-        } = supabase.auth.onAuthStateChange((event, session) => {
-            setSession(session);
+        } = supabase.auth.onAuthStateChange((event, newSession) => {
+            console.log("Auth state change:", event);
+            setSession(newSession);
             setLoading(false);
+
+            if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
+                // Reset any errors when successfully authenticated
+                setError(null);
+            }
+
+            if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+                setSession(null);
+            }
         });
 
         return () => subscription.unsubscribe();
     }, []);
 
-    // When the session updates (user signs in), check if a profile row exists.
-    // When the session updates (user signs in), check if a profile row exists
+    // Profile creation logic (unchanged)
     useEffect(() => {
         const createProfileIfMissing = async () => {
             if (session?.user) {
-                // Upsert will insert if missing, or do nothing if already exists
-                const { error } = await supabase
-                    .from("profiles")
-                    .upsert({
-                        id: session.user.id,
-                        bio: "",
-                        profile_picture: "",
-                        preferences: {},
-                    });
-                if (error && error.code !== "23505") { // 23505 is the unique violation error code
-                    console.error("Error creating/upserting profile:", error.message);
+                try {
+                    const { error } = await supabase
+                        .from("profiles")
+                        .upsert({
+                            id: session.user.id,
+                            bio: "",
+                            profile_picture: "",
+                            preferences: {},
+                        });
+                    if (error && error.code !== "23505") {
+                        console.error("Error creating/upserting profile:", error.message);
+                    }
+                } catch (err) {
+                    console.error("Profile creation error:", err.message);
                 }
             }
         };
@@ -58,26 +85,37 @@ export function AuthProvider({ children }) {
 
     // Sign in function using passwordless magic link.
     const signIn = async (email) => {
-        const { error } = await supabase.auth.signInWithOtp({ email });
-        if (error) {
-            console.error("Sign in error:", error.message);
+        setLoading(true);
+        try {
+            const { error } = await supabase.auth.signInWithOtp({ email });
+            if (error) throw error;
+            return { error: null };
+        } catch (err) {
+            console.error("Sign in error:", err.message);
+            setError(err);
+            return { error: err };
+        } finally {
+            setLoading(false);
         }
-        return { error };
     };
 
     // Sign out function.
     const signOut = async () => {
-        const { error } = await supabase.auth.signOut();
-        if (error) {
-            console.error("Sign out error:", error.message);
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+            setSession(null);
+        } catch (err) {
+            console.error("Sign out error:", err.message);
+            setError(err);
         }
-        setSession(null);
     };
 
     const value = {
         session,
         user: session?.user,
         loading,
+        error,
         signIn,
         signOut,
         setSession,

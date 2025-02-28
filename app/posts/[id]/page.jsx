@@ -1,8 +1,8 @@
-import PostDetail from './PostDetail';
+import PostDetail from "./PostDetail";
 
 export default async function PostPage({ params }) {
-    // Properly await the params object before accessing properties
-    const resolvedParams = await Promise.resolve(params);
+  // Properly await the params object before accessing properties
+  const resolvedParams = await Promise.resolve(params);
 
-    return <PostDetail id={resolvedParams.id} />;
+  return <PostDetail id={resolvedParams.id} />;
 }

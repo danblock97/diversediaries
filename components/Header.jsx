@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import AuthModal from "@/components/AuthModal";
 import { supabase } from "@/lib/supabaseClient";
+import NotificationsButton from "@/components/NotificationsButton";
 import Link from "next/link";
 
 export default function Header() {
@@ -23,40 +24,46 @@ export default function Header() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const toggleDropdown = () => setDropdownOpen(!dropdownOpen);
 
+  // In Header.jsx - updated fetchProfileData function
   useEffect(() => {
     async function fetchProfileData() {
       if (!user) return;
 
-      console.log("Fetching profile data for user:", user.id);
-
-      if (!supabase) {
-        console.error("Supabase client is not initialized");
-        return;
-      }
-
       try {
         const userId = user.id;
-        console.log("Using user ID:", userId);
 
+        // Try to get existing profile
         const { data, error } = await supabase
           .from("profiles")
           .select("is_admin")
-          .eq("id", userId)
-          .single();
+          .eq("id", userId);
 
-        if (error) {
-          console.error(
-            "Error fetching profile:",
-            error.message,
-            error.details,
-            error.hint,
-          );
+        // No profile exists, create one
+        if (error || data.length === 0) {
+          console.log("No profile found, creating one for new user");
+
+          const { error: insertError } = await supabase
+            .from("profiles")
+            .insert([
+              {
+                id: userId,
+                username: user.email?.split("@")[0] || "user",
+                is_admin: false,
+                created_at: new Date().toISOString(),
+              },
+            ]);
+
+          if (insertError) {
+            console.error("Error creating profile:", insertError);
+          }
+
+          setIsAdmin(false);
           return;
         }
 
-        console.log("Profile data received:", data);
-        if (data) {
-          setIsAdmin(!!data.is_admin);
+        // Profile exists
+        if (data && data.length > 0) {
+          setIsAdmin(!!data[0].is_admin);
         }
       } catch (err) {
         console.error("Exception when fetching profile:", err);
@@ -217,24 +224,7 @@ export default function Header() {
             Write
           </a>
 
-          <button
-            type="button"
-            className="relative text-gray-600 hover:text-black"
-          >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M15 17h5l-1.405-1.405M19 13V8a6 6 0 10-12 0v5M13 21a2 2 0 01-2 2M12 3v1"
-              />
-            </svg>
-          </button>
+          <NotificationsButton userId={user.id} />
 
           {/* Avatar Dropdown */}
           <div className="relative">

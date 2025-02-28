@@ -214,6 +214,47 @@ export default function PostDetail({ id }) {
 
       if (error) throw new Error(error.message);
 
+      // Create notification
+      // First get the post details
+      const { data: postData } = await supabase
+        .from("posts")
+        .select("user_id, title")
+        .eq("id", id)
+        .single();
+
+      // Create notification for post author if not a self-comment
+      if (postData && postData.user_id !== user.id) {
+        await supabase.from("notifications").insert([
+          {
+            recipient_id: postData.user_id,
+            type: "comment",
+            message: `Someone commented on your post "${postData.title.substring(0, 25)}${postData.title.length > 25 ? "..." : ""}"`,
+            is_read: false,
+          },
+        ]);
+      }
+
+      // If it's a reply, also notify the author of the parent comment
+      if (replyingTo) {
+        const { data: parentCommentData } = await supabase
+          .from("comments")
+          .select("user_id")
+          .eq("id", replyingTo)
+          .single();
+
+        // Notify parent comment author if they're different from the current user
+        if (parentCommentData && parentCommentData.user_id !== user.id) {
+          await supabase.from("notifications").insert([
+            {
+              recipient_id: parentCommentData.user_id,
+              type: "reply",
+              message: "Someone replied to your comment",
+              is_read: false,
+            },
+          ]);
+        }
+      }
+
       await fetchComments();
 
       setNewComment("");

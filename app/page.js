@@ -1,205 +1,261 @@
 "use client";
 
-import { useAuth } from "@/context/AuthContext";
-import Image from "next/image";
-import { Typewriter } from "react-simple-typewriter";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 
-export default function Home() {
+// CategoriesNav acts as a filter.
+function CategoriesNav({ selectedCategory, onSelect }) {
+    const [categories, setCategories] = useState([]);
+
+    useEffect(() => {
+        async function fetchCategories() {
+            const { data, error } = await supabase.from("categories").select("*");
+            if (!error) {
+                setCategories(data);
+            } else {
+                console.error("Error fetching categories:", error.message);
+            }
+        }
+        fetchCategories();
+    }, []);
+
+    return (
+        <nav className="flex items-center space-x-4 text-sm text-gray-600 mb-8">
+            <button
+                onClick={() => onSelect(null)}
+                className={`hover:underline ${selectedCategory === null ? "font-bold" : ""}`}
+            >
+                All
+            </button>
+            {categories.map((cat) => (
+                <button
+                    key={cat.id}
+                    onClick={() => onSelect(cat.id)}
+                    className={`hover:underline ${selectedCategory === cat.id ? "font-bold" : ""}`}
+                >
+                    {cat.name}
+                </button>
+            ))}
+        </nav>
+    );
+}
+
+// Utility: Given an array of posts, fetch the corresponding profiles from the public profiles table.
+// We select only the columns that exist (e.g. id, avatar_url).
+async function mergeProfilesWithPosts(postsData) {
+    const userIds = [...new Set(postsData.map((post) => post.user_id))];
+
+    const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, avatar_url")
+        .in("id", userIds);
+
+    if (profilesError) {
+        console.error("Error fetching profiles:", profilesError.message);
+        return postsData.map((post) => ({ ...post, profile: null }));
+    }
+
+    const profilesById = {};
+    profilesData.forEach((profile) => {
+        profilesById[profile.id] = profile;
+    });
+
+    return postsData.map((post) => ({
+        ...post,
+        profile: profilesById[post.user_id] || null,
+    }));
+}
+
+// PostsFeed implements infinite scroll using Intersection Observer.
+// It also wraps each post in a Link to /posts/[id].
+function PostsFeed({ selectedCategory }) {
+    const [posts, setPosts] = useState([]);
+    const [page, setPage] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
+    const pageSize = 10;
     const { user } = useAuth();
-    const isAuthenticated = !!user;
+    const observerRef = useRef();
+    const fetchInProgress = useRef(false);
 
-    if (isAuthenticated) {
-        // Authenticated Layout (Feed-like UI)
-        return (
-            <div className="max-w-7xl mx-auto px-4 py-12 h-screen">
-                {/* Top navigation for feed filtering, categories, etc. */}
-                <nav className="flex items-center space-x-4 text-sm text-gray-600 mb-8">
-                    <Link href="#" className="font-semibold hover:underline">
-                        For you
-                    </Link>
-                    <Link href="#" className="hover:underline">
-                        Following
-                    </Link>
-                    <Link href="#" className="hover:underline">
-                        Featured
-                    </Link>
-                    <Link href="#" className="hover:underline">
-                        Staff Picks
-                    </Link>
-                    <Link href="#" className="hover:underline">
-                        Software Development
-                    </Link>
-                </nav>
+    useEffect(() => {
+        setPosts([]);
+        setPage(1);
+        setHasMore(true);
+    }, [selectedCategory]);
 
-                <div className="flex flex-col md:flex-row gap-8">
-                    {/* Left Column: Feed of posts */}
-                    <div className="md:w-2/3 space-y-8">
-                        {/* Sample Post 1 */}
-                        <div className="flex flex-col border-b border-gray-200 pb-6">
+    const fetchPosts = useCallback(async () => {
+        if (fetchInProgress.current || !hasMore) return;
+        fetchInProgress.current = true;
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+
+        let query = supabase
+            .from("posts")
+            .select("*, post_categories!inner(category_id)")
+            .order("created_at", { ascending: false })
+            .order("id", { ascending: false })
+            .range(from, to);
+
+        if (selectedCategory) {
+            query = query.eq("post_categories.category_id", selectedCategory);
+        }
+
+        const { data: postsData, error: postsError } = await query;
+        if (postsError) {
+            console.error("Error fetching posts:", postsError.message);
+        } else if (postsData) {
+            // Optionally, if you want to merge profile data, uncomment:
+            // const postsWithProfile = await mergeProfilesWithPosts(postsData);
+            // For now, we simply append postsData.
+            setPosts((prev) => {
+                const existingIds = new Set(prev.map((p) => p.id));
+                const newPosts = postsData.filter((p) => !existingIds.has(p.id));
+                return [...prev, ...newPosts];
+            });
+            if (postsData.length < pageSize) setHasMore(false);
+            else setPage((prev) => prev + 1);
+        }
+        fetchInProgress.current = false;
+    }, [page, pageSize, selectedCategory, hasMore]);
+
+    const sentinelRef = useCallback(
+        (node) => {
+            if (fetchInProgress.current) return;
+            if (observerRef.current) observerRef.current.disconnect();
+            observerRef.current = new IntersectionObserver((entries) => {
+                if (entries[0].isIntersecting && hasMore) {
+                    fetchPosts();
+                }
+            });
+            if (node) observerRef.current.observe(node);
+        },
+        [fetchPosts, hasMore]
+    );
+
+    return (
+        <div>
+            {posts.map((post) => {
+                const authorName =
+                    user && user.id === post.user_id ? user.email : "Anonymous";
+                return (
+                    <Link key={post.id} href={`/posts/${post.id}`} className="block">
+                        <div className="flex flex-col border-b border-gray-200 pb-6 hover:bg-gray-50 transition">
                             <p className="text-sm text-gray-500 mb-2">
-                                Artificial Intelligence · 5 min read
+                                {authorName} · {post.read_time || 5} min read
                             </p>
-                            <h2 className="text-xl font-semibold mb-2">
-                                You’re Using ChatGPT Wrong! Here’s How to be Ahead of 99% of
-                                ChatGPT Users
-                            </h2>
-                            <p className="text-gray-700 mb-2">
-                                Master ChatGPT by learning prompt engineering...
+                            <h2 className="text-xl font-semibold mb-2">{post.title}</h2>
+                            <p className="text-gray-700 mb-2">{post.excerpt}</p>
+                            <p className="text-sm text-gray-500">
+                                {new Date(post.created_at).toLocaleDateString()}
                             </p>
-                            <p className="text-sm text-gray-500">Jul 26, 2026</p>
                         </div>
+                    </Link>
+                );
+            })}
+            {(!hasMore && posts.length === 0) && (
+                <div className="py-8 text-center text-gray-500">
+                    <p>No posts found in this category. Try another filter or check back later!</p>
+                </div>
+            )}
+            <div ref={sentinelRef} />
+        </div>
+    );
+}
 
-                        {/* Sample Post 2 */}
-                        <div className="flex flex-col border-b border-gray-200 pb-6">
-                            <p className="text-sm text-gray-500 mb-2">
-                                Dmitri Ivanov · 8 min read
-                            </p>
-                            <h2 className="text-xl font-semibold mb-2">
-                                How does Single-Sign-On (SSO) work?
-                            </h2>
-                            <p className="text-gray-700 mb-2">
-                                Single-Sign-On (SSO) is a crucial piece of the modern identity
-                                puzzle...
-                            </p>
-                            <p className="text-sm text-gray-500">Jul 25, 2026</p>
-                        </div>
+function DevPicks() {
+    const [devPosts, setDevPosts] = useState([]);
+    const { user } = useAuth();
+    const fetchInProgress = useRef(false);
 
-                        {/* Sample Post 3 */}
-                        <div className="flex flex-col border-b border-gray-200 pb-6">
-                            <p className="text-sm text-gray-500 mb-2">
-                                Laura de Lacq · Software &amp; Startups
-                            </p>
-                            <h2 className="text-xl font-semibold mb-2">
-                                Why Some Developers Will Never Improve
-                            </h2>
-                            <p className="text-gray-700 mb-2">
-                                Reflecting on the habits that hold us back...
-                            </p>
-                            <p className="text-sm text-gray-500">Jul 24, 2026</p>
-                        </div>
-                    </div>
+    useEffect(() => {
+        async function fetchRandomPosts() {
+            if (fetchInProgress.current) return;
+            fetchInProgress.current = true;
 
-                    {/* Right Column: Sidebar with “Staff Picks”, etc. */}
-                    <div className="md:w-1/3 space-y-6">
-                        {/* Staff Picks */}
-                        <div className="p-4 border border-gray-200 rounded">
-                            <h3 className="text-lg font-bold mb-3">Staff Picks</h3>
-                            <ul className="space-y-2 text-sm">
-                                <li className="flex items-start">
-                                    <span className="text-gray-600">1.</span>
-                                    <div className="ml-2">
-                                        <Link href="#" className="text-gray-800 hover:underline">
-                                                First-person perspectives on 3 years of remote
-                                        </Link>
-                                    </div>
-                                </li>
-                                <li className="flex items-start">
-                                    <span className="text-gray-600">2.</span>
-                                    <div className="ml-2">
-                                        <Link href="#" className="text-gray-800 hover:underline">
-                                                Negatives and Negative Capability
-                                        </Link>
-                                    </div>
-                                </li>
-                                <li className="flex items-start">
-                                    <span className="text-gray-600">3.</span>
-                                    <div className="ml-2">
-                                        <Link href="#" className="text-gray-800 hover:underline">
-                                                A guide to data inflation while you’re coding
-                                        </Link>
-                                    </div>
-                                </li>
-                            </ul>
-                        </div>
+            const { data: postsData, error: postsError } = await supabase
+                .from("posts")
+                .select("*")
+                .order("created_at", { ascending: false })
+                .order("id", { ascending: false })
+                .limit(3);
 
-                        {/* Writing on Medium box (example) */}
-                        <div className="p-4 border border-gray-200 rounded">
-                            <h3 className="text-lg font-bold mb-3">Writing in Medium</h3>
-                            <p className="text-sm text-gray-700 mb-4">
-                                Explore how to start writing, gain your audience and more...
-                            </p>
-                            <Link href="#" className="text-sm text-green-600 hover:underline font-medium">
-                                    Get started
+            if (postsError) {
+                console.error("Error fetching dev picks:", postsError.message);
+            } else if (postsData) {
+                const uniquePosts = Array.from(
+                    new Map(postsData.map((post) => [post.id, post])).values()
+                );
+                setDevPosts(uniquePosts);
+            }
+            fetchInProgress.current = false;
+        }
+        fetchRandomPosts();
+    }, []);
+
+    return (
+        <div className="p-4 border border-gray-200 rounded">
+            <h3 className="text-lg font-bold mb-3">Dev Picks</h3>
+            <ul>
+                {devPosts.map((post) => {
+                    const authorName =
+                        user && user.id === post.user_id ? user.email : "Anonymous";
+                    return (
+                        <li key={post.id} className="mb-4">
+                            {/* Display the user's name or email */}
+                            <p className="text-sm text-gray-500 mb-1">{authorName}</p>
+                            {/* Post title in bold linking to the individual post */}
+                            <Link href={`/posts/${post.id}`} className="hover:underline">
+                                <h4 className="font-bold text-lg">{post.title}</h4>
                             </Link>
-                        </div>
+                            {/* Date published using created_at */}
+                            <p className="text-sm text-gray-500">
+                                {new Date(post.created_at).toLocaleDateString()}
+                            </p>
+                        </li>
+                    );
+                })}
+            </ul>
+        </div>
+    );
+}
 
-                        {/* Additional recommended topics */}
-                        <div>
-                            <h3 className="text-sm font-bold text-gray-600 mb-2">
-                                Recommended topics
-                            </h3>
-                            <ul className="flex flex-wrap gap-2 text-sm">
-                                <li>
-                                    <Link href="#" className="bg-gray-100 px-3 py-1 rounded hover:bg-gray-200">
-                                            Tech
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link href="#" className="bg-gray-100 px-3 py-1 rounded hover:bg-gray-200">
-                                            AI
-                                    </Link>
-                                </li>
-                                <li>
-                                    <Link href="#" className="bg-gray-100 px-3 py-1 rounded hover:bg-gray-200">
-                                            Self Improvement
-                                    </Link>
-                                </li>
-                            </ul>
-                        </div>
-                    </div>
+// HeroSection remains unchanged.
+function HeroSection() {
+    return (
+        <section className="max-w-7xl mx-auto flex flex-col-reverse md:flex-row items-center justify-center gap-8 px-4 py-12 md:py-20 h-screen">
+            <div className="md:w-1/2 md:pr-8 mt-8 md:mt-0">
+                <h1 className="text-6xl md:text-7xl font-bold mb-4 leading-tight">Diverse Diaries</h1>
+                <p className="text-xl md:text-xl text-gray-700 mb-6">Discover inspiring stories and insights.</p>
+                <button className="bg-black text-white px-6 py-3 rounded-full">Start reading</button>
+            </div>
+            <div className="md:w-1/2 flex justify-center md:justify-start">
+                <img src="/images/hero.png" alt="Hero" width={600} height={400} />
+            </div>
+        </section>
+    );
+}
+
+// Main Homepage component holds the selectedCategory state.
+export default function Home() {
+    const { user, loading } = useAuth();
+    const [selectedCategory, setSelectedCategory] = useState(null);
+
+    if (loading) return <p>Loading...</p>;
+    if (!user) return <HeroSection />;
+
+    return (
+        <div className="max-w-7xl mx-auto px-4 py-12 min-h-screen">
+            <CategoriesNav selectedCategory={selectedCategory} onSelect={setSelectedCategory} />
+            <div className="flex flex-col md:flex-row gap-8">
+                <div className="md:w-2/3 space-y-8">
+                    <PostsFeed selectedCategory={selectedCategory} />
+                </div>
+                <div className="md:w-1/3 space-y-6">
+                    <DevPicks />
                 </div>
             </div>
-        );
-    } else {
-        // Non-Authenticated Layout (Hero Section)
-        return (
-            <section
-                className="
-          max-w-7xl mx-auto
-          flex flex-col-reverse md:flex-row
-          items-center justify-center
-          gap-8
-          px-4 py-12 md:py-20 h-screen
-        "
-            >
-                {/* Left Column: Static Heading & Typing Effect Paragraph */}
-                <div className="md:w-1/2 md:pr-8 mt-8 md:mt-0">
-                    <h1 className="text-6xl md:text-7xl font-bold mb-4 leading-tight">
-                        Diverse Diaries
-                    </h1>
-                    <p className="text-xl md:text-xl text-gray-700 mb-6">
-                        <Typewriter
-                            words={[
-                                "A place to read, write, and deepen your understanding",
-                                "Inspiring ideas at your fingertips",
-                                "Empowering your creative voice",
-                            ]}
-                            loop={true}
-                            cursor
-                            cursorStyle="|"
-                            typeSpeed={70}
-                            deleteSpeed={50}
-                            delaySpeed={2000}
-                        />
-                    </p>
-                    <button className="bg-black text-white px-6 py-3 rounded-full">
-                        Start reading
-                    </button>
-                </div>
-
-                {/* Right Column: Hero Image */}
-                <div className="md:w-1/2 flex justify-center md:justify-start">
-                    <Image
-                        src="/images/hero.png"
-                        alt="Hero"
-                        width={600}
-                        height={400}
-                        className=""
-                        priority
-                    />
-                </div>
-            </section>
-        );
-    }
+        </div>
+    );
 }

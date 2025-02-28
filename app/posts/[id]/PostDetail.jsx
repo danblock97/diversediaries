@@ -10,15 +10,13 @@ export default function PostDetail({ id }) {
     const { user } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const [feedbackModalOpen, setFeedbackModalOpen] = useState(
-        searchParams.get("feedback") === "true"
-    );
+    const [feedbackModalOpen, setFeedbackModalOpen] = useState(searchParams.get("feedback") === "true");
 
     const [post, setPost] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [comments, setComments] = useState([]);
-    const [newComment, setNewComment] = useState("");
+    const [newComment, setNewComment] = useState('');
     const [commentLoading, setCommentLoading] = useState(false);
     const [readTime, setReadTime] = useState("5 min");
     const [replyingTo, setReplyingTo] = useState(null);
@@ -32,12 +30,11 @@ export default function PostDetail({ id }) {
             try {
                 const { data: postData, error: postError } = await supabase
                     .from("posts")
-                    .select("*")
+                    .select('*')
                     .eq("id", id)
                     .single();
 
-                if (postError)
-                    throw new Error(postError.message || "Failed to fetch post");
+                if (postError) throw new Error(postError.message || "Failed to fetch post");
                 if (!postData) throw new Error("Post not found");
 
                 const wordCount = postData.content.split(/\s+/).length;
@@ -48,8 +45,8 @@ export default function PostDetail({ id }) {
                 try {
                     const { data: profile, error: profileError } = await supabase
                         .from("profiles")
-                        .select("bio, profile_picture")
-                        .eq("id", postData.user_id)
+                        .select('bio, profile_picture')
+                        .eq('id', postData.user_id)
                         .single();
 
                     if (!profileError) authorProfile = profile;
@@ -61,15 +58,15 @@ export default function PostDetail({ id }) {
                 try {
                     const { data: categoryData } = await supabase
                         .from("post_categories")
-                        .select("category_id")
-                        .eq("post_id", id);
+                        .select('category_id')
+                        .eq('post_id', id);
 
                     if (categoryData?.length > 0) {
-                        const categoryIds = categoryData.map((pc) => pc.category_id);
+                        const categoryIds = categoryData.map(pc => pc.category_id);
                         const { data: categoriesData } = await supabase
                             .from("categories")
-                            .select("*")
-                            .in("id", categoryIds);
+                            .select('*')
+                            .in('id', categoryIds);
 
                         categories = categoriesData || [];
                     }
@@ -86,12 +83,13 @@ export default function PostDetail({ id }) {
                     ...postData,
                     profiles: {
                         ...authorProfile,
-                        username: authorEmail,
+                        username: authorEmail
                     },
-                    post_categories: categories.map((cat) => ({
-                        categories: cat,
-                    })),
+                    post_categories: categories.map(cat => ({
+                        categories: cat
+                    }))
                 });
+
             } catch (err) {
                 console.error("Error fetching post:", err);
                 setError(err.message || "Failed to load post");
@@ -109,12 +107,11 @@ export default function PostDetail({ id }) {
         try {
             const { data: commentsData, error } = await supabase
                 .from("comments")
-                .select("*")
+                .select('*')
                 .eq("post_id", id)
-                .order("created_at", { ascending: false });
+                .order('created_at', { ascending: false });
 
-            if (error)
-                throw new Error(error.message || "Failed to fetch comments");
+            if (error) throw new Error(error.message || "Failed to fetch comments");
 
             if (!commentsData || commentsData.length === 0) {
                 setComments([]);
@@ -122,23 +119,23 @@ export default function PostDetail({ id }) {
                 return;
             }
 
-            const userIds = [...new Set(commentsData.map((comment) => comment.user_id))];
+            const userIds = [...new Set(commentsData.map(comment => comment.user_id))];
             let profilesData = {};
 
             if (userIds.length > 0) {
                 const { data: profiles, error: profilesError } = await supabase
                     .from("profiles")
-                    .select("id, username, avatar_url")
-                    .in("id", userIds);
+                    .select('id, username, avatar_url')
+                    .in('id', userIds);
 
                 if (!profilesError && profiles) {
-                    profiles.forEach((profile) => {
+                    profiles.forEach(profile => {
                         profilesData[profile.id] = profile;
                     });
                 }
             }
 
-            const commentsWithProfiles = commentsData.map((comment) => {
+            const commentsWithProfiles = commentsData.map(comment => {
                 const isCurrentUser = user && user.id === comment.user_id;
                 const emailOrUsername = isCurrentUser ? user.email : null;
 
@@ -147,17 +144,17 @@ export default function PostDetail({ id }) {
                     profiles: profilesData[comment.user_id]
                         ? {
                             ...profilesData[comment.user_id],
-                            email: emailOrUsername,
+                            email: emailOrUsername
                         }
                         : {
                             username: emailOrUsername || "Anonymous",
-                            avatar_url: null,
-                        },
+                            avatar_url: null
+                        }
                 };
             });
 
             const threads = {};
-            commentsWithProfiles.forEach((comment) => {
+            commentsWithProfiles.forEach(comment => {
                 if (comment.parent_comment_id) {
                     if (!threads[comment.parent_comment_id]) {
                         threads[comment.parent_comment_id] = { replies: [] };
@@ -171,12 +168,9 @@ export default function PostDetail({ id }) {
             });
 
             setCommentThreads(threads);
-            setComments(commentsWithProfiles.filter((c) => !c.parent_comment_id));
+            setComments(commentsWithProfiles.filter(c => !c.parent_comment_id));
         } catch (err) {
-            console.error(
-                "Error fetching comments:",
-                err.message || JSON.stringify(err)
-            );
+            console.error("Error fetching comments:", err.message || JSON.stringify(err));
             setComments([]);
             setCommentThreads({});
         }
@@ -214,7 +208,7 @@ export default function PostDetail({ id }) {
 
             await fetchComments();
 
-            setNewComment("");
+            setNewComment('');
             setReplyingTo(null);
         } catch (err) {
             alert("Failed to post comment. Please try again.");
@@ -225,22 +219,14 @@ export default function PostDetail({ id }) {
 
     const Comment = ({ comment, isReply = false, onReply }) => {
         return (
-            <div
-                className={`bg-white rounded-lg ${
-                    isReply ? "border-l-4 border-gray-200 pl-4" : "shadow-sm"
-                } p-6 mb-4`}
-            >
+            <div className={`bg-white rounded-lg ${isReply ? 'border-l-4 border-gray-200 pl-4' : 'shadow-sm'} p-6 mb-4`}>
                 <div className="flex items-start">
                     <div className="flex-shrink-0 w-10 h-10 bg-gray-300 rounded-full overflow-hidden mr-4">
                         {comment.profiles?.avatar_url ? (
-                            <img
-                                src={comment.profiles.avatar_url}
-                                alt="Commenter"
-                                className="w-full h-full object-cover"
-                            />
+                            <img src={comment.profiles.avatar_url} alt="Commenter" className="w-full h-full object-cover" />
                         ) : (
                             <div className="h-full w-full flex items-center justify-center bg-gray-200 text-gray-500">
-                                {comment.profiles?.username?.charAt(0)?.toUpperCase() || "A"}
+                                {comment.profiles?.username?.charAt(0)?.toUpperCase() || 'A'}
                             </div>
                         )}
                     </div>
@@ -248,42 +234,21 @@ export default function PostDetail({ id }) {
                         <div className="flex justify-between items-center mb-2">
                             <div>
                                 <p className="font-medium text-gray-900">
-                                    {comment.profiles?.username ||
-                                        comment.profiles?.email ||
-                                        "Anonymous"}
+                                    {comment.profiles?.username || comment.profiles?.email || 'Anonymous'}
                                 </p>
-                                <p className="text-xs text-gray-500">
-                                    {new Date(comment.created_at).toLocaleDateString("en-US", {
-                                        month: "short",
-                                        day: "numeric",
-                                        year: "numeric",
-                                    })}
-                                </p>
+                                <p className="text-xs text-gray-500">{new Date(comment.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                             </div>
                         </div>
                         <div className="prose prose-sm max-w-none">
-                            <p className="text-gray-800 whitespace-pre-line">
-                                {comment.content}
-                            </p>
+                            <p className="text-gray-800 whitespace-pre-line">{comment.content}</p>
                         </div>
                         <div className="mt-3">
                             <button
                                 onClick={() => onReply(comment.id)}
                                 className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center"
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-4 w-4 mr-1"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                >
-                                    <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                                    />
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                                 </svg>
                                 Reply
                             </button>
@@ -311,40 +276,17 @@ export default function PostDetail({ id }) {
     }
 
     const processContent = (content) => {
-        if (!content) return "";
+        if (!content) return '';
         let processed = content;
-        processed = processed.replace(
-            /<img([^>]*)>/g,
-            '<img$1 class="my-8 max-w-full h-auto rounded-lg shadow-md">'
-        );
-        processed = processed.replace(
-            /<p>/g,
-            '<p class="text-lg text-gray-800 mb-7 leading-relaxed font-serif">'
-        );
-        processed = processed.replace(
-            /<h2>/g,
-            '<h2 class="text-3xl font-serif font-bold mt-12 mb-6 text-gray-900">'
-        );
-        processed = processed.replace(
-            /<h3>/g,
-            '<h3 class="text-2xl font-serif font-bold mt-10 mb-4 text-gray-900">'
-        );
-        processed = processed.replace(
-            /<a /g,
-            '<a class="text-blue-600 underline decoration-blue-500/30 hover:decoration-blue-500" '
-        );
-        processed = processed.replace(
-            /<blockquote>/g,
-            '<blockquote class="border-l-4 border-gray-200 pl-4 italic my-6 text-gray-700">'
-        );
-        processed = processed.replace(
-            /<ul>/g,
-            '<ul class="list-disc pl-6 my-6 space-y-2">'
-        );
-        processed = processed.replace(
-            /<ol>/g,
-            '<ol class="list-decimal pl-6 my-6 space-y-2">'
-        );
+        processed = processed.replace(/<img([^>]*)>/g,
+            '<img$1 class="my-8 max-w-full h-auto rounded-lg shadow-md">');
+        processed = processed.replace(/<p>/g, '<p class="text-lg text-gray-800 mb-7 leading-relaxed font-serif">');
+        processed = processed.replace(/<h2>/g, '<h2 class="text-3xl font-serif font-bold mt-12 mb-6 text-gray-900">');
+        processed = processed.replace(/<h3>/g, '<h3 class="text-2xl font-serif font-bold mt-10 mb-4 text-gray-900">');
+        processed = processed.replace(/<a /g, '<a class="text-blue-600 underline decoration-blue-500/30 hover:decoration-blue-500" ');
+        processed = processed.replace(/<blockquote>/g, '<blockquote class="border-l-4 border-gray-200 pl-4 italic my-6 text-gray-700">');
+        processed = processed.replace(/<ul>/g, '<ul class="list-disc pl-6 my-6 space-y-2">');
+        processed = processed.replace(/<ol>/g, '<ol class="list-decimal pl-6 my-6 space-y-2">');
         return processed;
     };
 
@@ -353,11 +295,8 @@ export default function PostDetail({ id }) {
             <header className="py-16 bg-gradient-to-b from-gray-50 to-white">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex flex-wrap gap-2 mb-4">
-                        {post.post_categories?.map((pc) => (
-                            <span
-                                key={pc.categories.id}
-                                className="px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition"
-                            >
+                        {post.post_categories?.map(pc => (
+                            <span key={pc.categories.id} className="px-3 py-1 rounded-full text-sm bg-gray-100 text-gray-700 hover:bg-gray-200 transition">
                 {pc.categories.name}
               </span>
                         ))}
@@ -368,29 +307,17 @@ export default function PostDetail({ id }) {
                     <div className="flex items-center">
                         <div className="flex-shrink-0 h-12 w-12 bg-gray-300 rounded-full overflow-hidden">
                             {post.profiles?.profile_picture ? (
-                                <img
-                                    src={post.profiles.profile_picture}
-                                    alt="Author"
-                                    className="h-full w-full object-cover"
-                                />
+                                <img src={post.profiles.profile_picture} alt="Author" className="h-full w-full object-cover" />
                             ) : (
                                 <div className="h-full w-full flex items-center justify-center bg-gray-200 text-gray-500">
-                                    {post.profiles?.username?.charAt(0)?.toUpperCase() || "A"}
+                                    {post.profiles?.username?.charAt(0)?.toUpperCase() || 'A'}
                                 </div>
                             )}
                         </div>
                         <div className="ml-4">
-                            <p className="text-base font-medium text-gray-900">
-                                {post.profiles?.username || "Anonymous"}
-                            </p>
+                            <p className="text-base font-medium text-gray-900">{post.profiles?.username || "Anonymous"}</p>
                             <div className="flex text-sm text-gray-500 items-center">
-                <span>
-                  {new Date(post.created_at).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                  })}
-                </span>
+                                <span>{new Date(post.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                                 <span className="mx-1">•</span>
                                 <span>{readTime}</span>
                             </div>
@@ -403,40 +330,28 @@ export default function PostDetail({ id }) {
                     className="article-content font-serif"
                     dangerouslySetInnerHTML={{ __html: processContent(post.content) }}
                 />
-                <script
-                    dangerouslySetInnerHTML={{
-                        __html: `
+                <script dangerouslySetInnerHTML={{ __html: `
           document.addEventListener('DOMContentLoaded', () => {
             const firstP = document.querySelector('.article-content > p:first-of-type');
             if (firstP) {
               firstP.classList.add('text-xl', 'font-medium');
             }
           });
-        `,
-                    }}
-                />
+        `}} />
                 <div className="border-t border-gray-200 my-12 pt-8">
                     <div className="flex items-center">
                         <div className="flex-shrink-0 h-16 w-16 bg-gray-300 rounded-full overflow-hidden">
                             {post.profiles?.profile_picture ? (
-                                <img
-                                    src={post.profiles.profile_picture}
-                                    alt="Author"
-                                    className="h-full w-full object-cover"
-                                />
+                                <img src={post.profiles.profile_picture} alt="Author" className="h-full w-full object-cover" />
                             ) : (
                                 <div className="h-full w-full flex items-center justify-center bg-gray-200 text-gray-500 text-xl">
-                                    {post.profiles?.username?.charAt(0)?.toUpperCase() || "A"}
+                                    {post.profiles?.username?.charAt(0)?.toUpperCase() || 'A'}
                                 </div>
                             )}
                         </div>
                         <div className="ml-4">
-                            <p className="text-lg font-medium text-gray-900">
-                                {post.profiles?.username || "Anonymous"}
-                            </p>
-                            <p className="text-gray-600 mt-1">
-                                {post.profiles?.bio || "Writer at Diverse Diaries"}
-                            </p>
+                            <p className="text-lg font-medium text-gray-900">{post.profiles?.username || "Anonymous"}</p>
+                            <p className="text-gray-600 mt-1">{post.profiles?.bio || "Writer at Diverse Diaries"}</p>
                         </div>
                     </div>
                 </div>
@@ -445,13 +360,7 @@ export default function PostDetail({ id }) {
                 <h2 className="text-2xl font-bold font-serif mb-8">Comments</h2>
                 <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <textarea
-              placeholder={
-                  replyingTo
-                      ? "Write a reply..."
-                      : user
-                          ? "Write a comment..."
-                          : "Sign in to comment"
-              }
+              placeholder={replyingTo ? "Write a reply..." : user ? "Write a comment..." : "Sign in to comment"}
               className="w-full border border-gray-200 p-4 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
               rows="4"
               value={newComment}
@@ -468,19 +377,11 @@ export default function PostDetail({ id }) {
                             </button>
                         )}
                         <button
-                            className={`px-5 py-2 rounded-full font-medium ${
-                                user
-                                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                            } transition`}
+                            className={`px-5 py-2 rounded-full font-medium ${user ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-gray-200 text-gray-500 cursor-not-allowed'} transition`}
                             onClick={handlePostComment}
                             disabled={!user || commentLoading}
                         >
-                            {commentLoading
-                                ? "Posting..."
-                                : replyingTo
-                                    ? "Post Reply"
-                                    : "Post Comment"}
+                            {commentLoading ? 'Posting...' : replyingTo ? 'Post Reply' : 'Post Comment'}
                         </button>
                     </div>
                 </div>
@@ -490,7 +391,7 @@ export default function PostDetail({ id }) {
                             <p>No comments yet. Be the first to comment!</p>
                         </div>
                     ) : (
-                        comments.map((comment) => {
+                        comments.map(comment => {
                             const thread = commentThreads[comment.id];
                             return (
                                 <div key={comment.id} className="comment-thread">
@@ -498,7 +399,7 @@ export default function PostDetail({ id }) {
                                         comment={comment}
                                         onReply={(id) => {
                                             setReplyingTo(id);
-                                            document.querySelector("textarea").focus();
+                                            document.querySelector('textarea').focus();
                                         }}
                                     />
                                     {thread?.replies && thread.replies.length > 0 && (
@@ -510,7 +411,7 @@ export default function PostDetail({ id }) {
                                                     isReply={true}
                                                     onReply={(id) => {
                                                         setReplyingTo(comment.id);
-                                                        document.querySelector("textarea").focus();
+                                                        document.querySelector('textarea').focus();
                                                     }}
                                                 />
                                             ))}
@@ -524,7 +425,6 @@ export default function PostDetail({ id }) {
             </section>
             {feedbackModalOpen && (
                 <FeedbackModal
-                    user={user}
                     isOpen={feedbackModalOpen}
                     onClose={() => {
                         setFeedbackModalOpen(false);

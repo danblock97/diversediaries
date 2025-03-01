@@ -9,17 +9,16 @@ import NotificationsButton from "@/components/NotificationsButton";
 import Link from "next/link";
 
 export default function Header() {
-  const { user, signOut, loading } = useAuth();
+  const { user, signOut } = useAuth();
   const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
   const [profilePicture, setProfilePicture] = useState(null);
   const [searchText, setSearchText] = useState("");
-  // searchResults now contains separate arrays for posts and people
   const [searchResults, setSearchResults] = useState({ posts: [], people: [] });
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef(null);
 
-  // Modal for non-auth sign in (if not authenticated)
+  // Modal for non-auth sign in
   const [modalOpen, setModalOpen] = useState(false);
   const openModal = () => setModalOpen(true);
   const closeModal = () => setModalOpen(false);
@@ -32,7 +31,7 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
 
-  // Fetch the profile to set isAdmin and profilePicture.
+  // Fetch the profile to set isAdmin and profilePicture
   useEffect(() => {
     async function fetchProfileData() {
       if (!user) return;
@@ -63,7 +62,7 @@ export default function Header() {
     fetchProfileData();
   }, [user]);
 
-  // Handle search input changes: search both posts and people.
+  // Handle search input changes: search both posts and people
   const handleSearchChange = async (e) => {
     const query = e.target.value;
     setSearchText(query);
@@ -75,7 +74,7 @@ export default function Header() {
     }
 
     try {
-      // Query posts matching the title.
+      // Query posts matching the title
       const { data: posts, error: postsError } = await supabase
         .from("posts")
         .select("id, title, user_id, created_at")
@@ -87,7 +86,7 @@ export default function Header() {
         console.error("Search posts error:", postsError);
       }
 
-      // Query people matching the display name.
+      // Query people matching the display name
       const { data: people, error: peopleError } = await supabase
         .from("profiles")
         .select("id, display_name, email, profile_picture")
@@ -133,7 +132,7 @@ export default function Header() {
     }
 
     function loadJiraCollector() {
-      // Load the Jira Issue Collector script using jQuery.ajax as required
+      // Load the Jira Issue Collector script using jQuery.ajax
       jQuery.ajax({
         url: "https://danblock97.atlassian.net/s/d41d8cd98f00b204e9800998ecf8427e-T/g2slup/b/9/b0105d975e9e59f24a3230a22972a71a/_/download/batch/com.atlassian.jira.collector.plugin.jira-issue-collector-plugin:issuecollector-embededjs/com.atlassian.jira.collector.plugin.jira-issue-collector-plugin:issuecollector-embededjs.js?locale=en-GB&collectorId=dce956ff",
         type: "get",
@@ -280,14 +279,15 @@ export default function Header() {
         <div className="flex items-center space-x-6 relative">
           <a
             href="/dashboard/new"
-            className="hover:underline text-sm font-medium"
+            className="hover:underline text-md font-medium"
           >
             Write
           </a>
 
+          {/* Authenticated Report a Bug */}
           <a
             id="myCustomTrigger"
-            className="hover:underline text-sm font-medium cursor-pointer pt-2"
+            className="hover:underline text-md font-medium cursor-pointer"
             onClick={() => setMobileMenuOpen(false)}
           >
             Report a Bug
@@ -350,13 +350,17 @@ export default function Header() {
     <header className="w-full border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between relative">
       <div className="logo text-2xl font-bold">Diverse Diaries</div>
       <nav className="hidden md:flex space-x-4">
-        <a id="myCustomTrigger" className="hover:underline cursor-pointer pt-2">
+        {/* Non-authenticated Report a Bug - add pt-2 */}
+        <a
+          id="myCustomTrigger"
+          className="hover:underline text-md font-medium cursor-pointer pt-2"
+        >
           Report a Bug
         </a>
         <a
           href="#"
           onClick={openModal}
-          className="hover:underline cursor-pointer pt-2"
+          className="hover:underline text-md font-medium cursor-pointer pt-2"
         >
           Sign in
         </a>
@@ -384,6 +388,7 @@ export default function Header() {
           </svg>
         </button>
       </div>
+
       {mobileMenuOpen && (
         <div className="absolute top-full left-0 w-full bg-white border-t border-gray-200 p-4 flex flex-col space-y-2 md:hidden">
           <a href="#" className="hover:underline">
@@ -408,7 +413,7 @@ export default function Header() {
               openModal();
               setMobileMenuOpen(false);
             }}
-            className="hover:underline cursor-pointer pt-2"
+            className="hover:underline text-sm font-medium cursor-pointer pt-2"
           >
             Sign in
           </a>
@@ -423,6 +428,7 @@ export default function Header() {
           </button>
         </div>
       )}
+
       <AuthModal isOpen={modalOpen} onClose={closeModal} />
     </header>
   );

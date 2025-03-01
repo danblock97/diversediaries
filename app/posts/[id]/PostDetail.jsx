@@ -12,26 +12,35 @@ export default function PostDetail({ id }) {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Modal states for feedback and reporting
   const [feedbackModalOpen, setFeedbackModalOpen] = useState(
     searchParams.get("feedback") === "true",
   );
+  const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState("");
 
+  // Post state
   const [post, setPost] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [readTime, setReadTime] = useState("5 min");
+
+  // Comments states
   const [comments, setComments] = useState([]);
+  const [commentThreads, setCommentThreads] = useState({});
   const [newComment, setNewComment] = useState("");
   const [commentLoading, setCommentLoading] = useState(false);
-  const [readTime, setReadTime] = useState("5 min");
   const [replyingTo, setReplyingTo] = useState(null);
-  const [commentThreads, setCommentThreads] = useState({});
 
+  // Fetch post data
   useEffect(() => {
     async function fetchPost() {
       if (!id) return;
       setLoading(true);
       try {
-        // Fetch post data
         const { data: postData, error: postError } = await supabase
           .from("posts")
           .select("*")
@@ -42,11 +51,12 @@ export default function PostDetail({ id }) {
           throw new Error(postError.message || "Failed to fetch post");
         if (!postData) throw new Error("Post not found");
 
+        // Calculate read time
         const wordCount = postData.content.split(/\s+/).length;
         const estimatedReadTime = Math.ceil(wordCount / 200);
         setReadTime(`${estimatedReadTime} min read`);
 
-        // Fetch the author's profile data (display_name, email, bio, profile_picture)
+        // Fetch the author's profile data
         let authorProfile = null;
         try {
           const { data: profile, error: profileError } = await supabase
@@ -58,8 +68,6 @@ export default function PostDetail({ id }) {
         } catch (profileErr) {
           console.error("Profile fetch exception:", profileErr);
         }
-
-        // Build a display name: prefer display_name, then email, then "Anonymous"
         const displayName =
           authorProfile?.display_name || authorProfile?.email || "Anonymous";
 
@@ -99,71 +107,43 @@ export default function PostDetail({ id }) {
         setLoading(false);
       }
     }
-
     fetchPost();
   }, [id, user]);
 
+  // Fetch comments data
   const fetchComments = async () => {
     if (!id) return;
-
     try {
       const { data: commentsData, error } = await supabase
         .from("comments")
         .select("*")
         .eq("post_id", id)
         .order("created_at", { ascending: false });
-
       if (error) throw new Error(error.message || "Failed to fetch comments");
-
       if (!commentsData || commentsData.length === 0) {
         setComments([]);
         setCommentThreads({});
         return;
       }
-
-      // Gather unique user IDs from comments
       const userIds = [
         ...new Set(commentsData.map((comment) => comment.user_id)),
       ];
-
-      let profilesData = {};
+      let profilesLookup = {};
       if (userIds.length > 0) {
-        console.log("Fetching profiles for user IDs:", userIds);
-
-        // Fetch profile data for each user
         const { data: profiles, error: profilesError } = await supabase
           .from("profiles")
           .select("*")
           .in("id", userIds);
-
-        console.log(
-          "Profiles fetch result:",
-          profiles,
-          "Error:",
-          profilesError,
-        );
-
         if (!profilesError && profiles) {
-          // Create a lookup object with user_id as key
           profiles.forEach((profile) => {
-            profilesData[profile.id] = profile;
+            profilesLookup[profile.id] = profile;
           });
         }
       }
-
-      // Attach profile data to each comment
-      const commentsWithProfiles = commentsData.map((comment) => {
-        return {
-          ...comment,
-          profiles: profilesData[comment.user_id] || {},
-        };
-      });
-
-      // Add console logs here, inside the function where the variables exist
-      console.log("Comments with profiles:", commentsWithProfiles);
-      console.log("Profile data lookup:", profilesData);
-
-      // Build comment threads
+      const commentsWithProfiles = commentsData.map((comment) => ({
+        ...comment,
+        profiles: profilesLookup[comment.user_id] || {},
+      }));
       const threads = {};
       commentsWithProfiles.forEach((comment) => {
         if (comment.parent_comment_id) {
@@ -177,7 +157,6 @@ export default function PostDetail({ id }) {
           }
         }
       });
-
       setCommentThreads(threads);
       setComments(commentsWithProfiles.filter((c) => !c.parent_comment_id));
     } catch (err) {
@@ -190,10 +169,88 @@ export default function PostDetail({ id }) {
     }
   };
 
-  // Fix the useEffect - remove the console.log statements here
   useEffect(() => {
     fetchComments();
   }, [id, user]);
+
+  // Report functionality
+  const openReportModal = () => {
+    if (!user) {
+      alert("Please sign in to report this post.");
+      return;
+    }
+    setReportModalOpen(true);
+  };
+
+  const submitReport = async () => {
+    if (!reportReason.trim()) {
+      setReportError("Please provide a reason for reporting.");
+      return;
+    }
+    setReportLoading(true);
+    setReportError("");
+    try {
+      const { error } = await supabase.from("reports").insert([
+        {
+          reporter_id: user.id,
+          post_id: id,
+          reason: reportReason.trim(),
+        },
+      ]);
+      if (error) throw error;
+      setReportModalOpen(false);
+      setReportReason("");
+      alert("Report submitted successfully.");
+    } catch (err) {
+      setReportError(err.message);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  // Inline Report Modal component
+  const ReportModal = () => {
+    if (!reportModalOpen) return null;
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div
+          className="absolute inset-0 bg-black opacity-50"
+          onClick={() => setReportModalOpen(false)}
+        />
+        <div className="relative bg-white rounded-lg p-6 max-w-md mx-auto">
+          <h3 className="text-xl font-bold mb-4">Report Post</h3>
+          <p className="mb-4">
+            Please let us know why you are reporting this post.
+          </p>
+          <textarea
+            className="w-full border border-gray-300 rounded-md p-3 mb-4 focus:ring-2 focus:ring-blue-500"
+            rows="4"
+            placeholder="Type your reason here..."
+            value={reportReason}
+            onChange={(e) => setReportReason(e.target.value)}
+          ></textarea>
+          {reportError && (
+            <p className="text-sm text-red-600 mb-4">{reportError}</p>
+          )}
+          <div className="flex justify-end space-x-4">
+            <button
+              onClick={() => setReportModalOpen(false)}
+              className="px-4 py-2 rounded border hover:bg-gray-100"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={submitReport}
+              disabled={reportLoading}
+              className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+            >
+              {reportLoading ? "Submitting..." : "Submit Report"}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   const handlePostComment = async () => {
     if (!newComment.trim()) return;
@@ -273,6 +330,7 @@ export default function PostDetail({ id }) {
     }
   };
 
+  // processContent function to format HTML content
   const processContent = (content) => {
     if (!content) return "";
     let processed = content;
@@ -329,6 +387,7 @@ export default function PostDetail({ id }) {
 
   return (
     <div className="bg-white min-h-screen">
+      {ReportModal()}
       <header className="py-16 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap gap-2 mb-4">
@@ -382,8 +441,14 @@ export default function PostDetail({ id }) {
           className="article-content font-serif"
           dangerouslySetInnerHTML={{ __html: processContent(post.content) }}
         />
-        <div className="mt-8 flex items-center justify-end">
+        <div className="mt-8 flex items-center justify-end space-x-4">
           <LikeButton postId={id} userId={user?.id} />
+          <button
+            onClick={openReportModal}
+            className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700"
+          >
+            Report Post
+          </button>
         </div>
         <script
           dangerouslySetInnerHTML={{
@@ -425,13 +490,7 @@ export default function PostDetail({ id }) {
         <h2 className="text-2xl font-bold font-serif mb-8">Comments</h2>
         <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
           <textarea
-            placeholder={
-              replyingTo
-                ? "Write a reply..."
-                : user
-                  ? "Write a comment..."
-                  : "Sign in to comment"
-            }
+            placeholder={user ? "Write a comment..." : "Sign in to comment"}
             className="w-full border border-gray-200 p-4 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
             rows="4"
             value={newComment}
@@ -481,7 +540,6 @@ export default function PostDetail({ id }) {
                       document.querySelector("textarea").focus();
                     }}
                   />
-
                   {thread?.replies && thread.replies.length > 0 && (
                     <div className="ml-12 mt-2 space-y-4">
                       {thread.replies.map((reply, index) => (

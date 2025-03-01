@@ -1,12 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 
 export default function AdminPage() {
-  // Always call these hooks
   const { user, loading } = useAuth();
   const router = useRouter();
 
@@ -14,7 +13,7 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminChecked, setAdminChecked] = useState(false);
 
-  // Dashboard state hooks (always declared)
+  // Dashboard state hooks
   const [activeTab, setActiveTab] = useState("overview");
   const [totalPosts, setTotalPosts] = useState(0);
   const [reportedItems, setReportedItems] = useState(0);
@@ -29,7 +28,7 @@ export default function AdminPage() {
   const [banModalOpen, setBanModalOpen] = useState(false);
   const [selectedUserToBan, setSelectedUserToBan] = useState(null);
 
-  // Admin check effect: always runs.
+  // Admin check effect
   useEffect(() => {
     async function checkAdmin() {
       if (!loading) {
@@ -55,7 +54,7 @@ export default function AdminPage() {
     checkAdmin();
   }, [user, loading, router]);
 
-  // Data fetching effect: only runs after admin check completes.
+  // Data fetching effect: runs once admin is checked
   useEffect(() => {
     if (!adminChecked || !isAdmin) return;
     fetchOverviewData();
@@ -65,8 +64,6 @@ export default function AdminPage() {
     fetchReports();
     fetchFeedback();
   }, [adminChecked, isAdmin]);
-
-  // Data fetching functions
 
   async function fetchOverviewData() {
     const { count: postsCount } = await supabase
@@ -138,7 +135,8 @@ export default function AdminPage() {
   async function fetchComments() {
     const { data: commentsData, error: commentsError } = await supabase
       .from("comments")
-      .select("id, content, created_at, user_id");
+      .select("id, content, created_at, user_id")
+      .order("created_at", { ascending: false });
     if (commentsError) {
       console.error("Error fetching comments:", JSON.stringify(commentsError));
       return;
@@ -176,17 +174,20 @@ export default function AdminPage() {
   }
 
   async function fetchReports() {
-    const { data, error } = await supabase.from("reports").select("*");
+    const { data, error } = await supabase
+      .from("reports")
+      .select("id, post_id, reason, created_at, resolved, posts(title)")
+      .order("created_at", { ascending: false });
     if (error) {
       console.error("Error fetching reports:", JSON.stringify(error));
       return;
     }
     const formattedReports = data.map((r) => ({
       id: r.id,
-      itemType: r.item_type,
-      itemTitle: r.item_title,
+      title: r.posts ? r.posts.title : "Unknown",
       reason: r.reason,
       date: new Date(r.created_at).toLocaleDateString(),
+      resolved: r.resolved,
     }));
     setReports(formattedReports);
   }
@@ -200,17 +201,28 @@ export default function AdminPage() {
       console.error("Error fetching feedback:", JSON.stringify(error));
       return;
     }
-    console.log("Feedback data fetched:", data);
     setFeedback(data);
   }
 
-  // Function to open the ban modal for a specific user.
+  // New function to remove a comment
+  async function handleRemoveComment(comment) {
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", comment.id);
+    if (error) {
+      console.error("Error removing comment:", error.message);
+    } else {
+      fetchComments();
+    }
+  }
+
+  // Ban modal functions
   const handleBanUser = (user) => {
     setSelectedUserToBan(user);
     setBanModalOpen(true);
   };
 
-  // Function to update the profile and ban the user.
   const confirmBanUser = async () => {
     if (!selectedUserToBan) return;
     const { error } = await supabase
@@ -226,7 +238,6 @@ export default function AdminPage() {
     setSelectedUserToBan(null);
   };
 
-  // Function to unban a user.
   const handleUnbanUser = async (user) => {
     const { error } = await supabase
       .from("profiles")
@@ -239,18 +250,54 @@ export default function AdminPage() {
     }
   };
 
-  // Always render the same hook structure.
+  // Functions for resolving and removing reports
+  const handleResolveReport = async (report) => {
+    const { error } = await supabase
+      .from("reports")
+      .update({
+        resolved: true,
+        resolved_at: new Date().toISOString(),
+        resolved_by: user?.id || null,
+      })
+      .eq("id", report.id);
+    if (error) {
+      console.error("Error resolving report:", error.message);
+    } else {
+      fetchReports();
+    }
+  };
+
+  const handleRemoveReport = async (report) => {
+    const { error } = await supabase
+      .from("reports")
+      .delete()
+      .eq("id", report.id);
+    if (error) {
+      console.error("Error removing report:", error.message);
+    } else {
+      fetchReports();
+    }
+  };
+
+  // Function for removing a post
+  const handleRemovePost = async (post) => {
+    const { error } = await supabase.from("posts").delete().eq("id", post.id);
+    if (error) {
+      console.error("Error removing post:", error.message);
+    } else {
+      fetchPosts();
+    }
+  };
+
   if (!adminChecked) {
     return <div>Loading...</div>;
   }
-
   if (!isAdmin) {
     return <div>Redirecting...</div>;
   }
 
   return (
     <div className="flex h-screen">
-      {/* Ban Confirmation Modal */}
       <BanConfirmationModal
         isOpen={banModalOpen}
         onClose={() => {
@@ -332,21 +379,30 @@ export default function AdminPage() {
             onUnbanUser={handleUnbanUser}
           />
         )}
-        {activeTab === "posts" && <Posts data={posts} />}
-        {activeTab === "comments" && <Comments data={comments} />}
-        {activeTab === "reports" && <Reports data={reports} />}
+        {activeTab === "posts" && (
+          <Posts data={posts} onRemovePost={handleRemovePost} />
+        )}
+        {activeTab === "comments" && (
+          <Comments data={comments} onRemoveComment={handleRemoveComment} />
+        )}
+        {activeTab === "reports" && (
+          <Reports
+            data={reports}
+            onResolveReport={handleResolveReport}
+            onRemoveReport={handleRemoveReport}
+          />
+        )}
         {activeTab === "feedback" && <Feedback data={feedback} />}
       </main>
     </div>
   );
 }
 
-// Ban Confirmation Modal Component
+// Ban Confirmation Modal component
 function BanConfirmationModal({ isOpen, onClose, onConfirm, user }) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      {/* Overlay */}
       <div className="absolute inset-0 bg-black opacity-50" onClick={onClose} />
       <div className="relative bg-white rounded-lg p-6 max-w-sm mx-auto">
         <h3 className="text-xl font-bold mb-4">Confirm Ban</h3>
@@ -373,7 +429,7 @@ function BanConfirmationModal({ isOpen, onClose, onConfirm, user }) {
   );
 }
 
-// Overview Section
+// Overview component
 function Overview({ totalPosts, reportedItems, activeUsers }) {
   return (
     <div>
@@ -396,7 +452,7 @@ function Overview({ totalPosts, reportedItems, activeUsers }) {
   );
 }
 
-// Users Section Component – now receives onBanUser and onUnbanUser callbacks.
+// Users component
 function Users({ data, onBanUser, onUnbanUser }) {
   return (
     <div>
@@ -438,9 +494,6 @@ function Users({ data, onBanUser, onUnbanUser }) {
                     Ban
                   </button>
                 )}
-                <button className="text-sm text-gray-600 hover:underline">
-                  View
-                </button>
               </td>
             </tr>
           ))}
@@ -450,8 +503,8 @@ function Users({ data, onBanUser, onUnbanUser }) {
   );
 }
 
-// Posts Section
-function Posts({ data }) {
+// Posts component
+function Posts({ data, onRemovePost }) {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Posts</h2>
@@ -470,11 +523,11 @@ function Posts({ data }) {
               <td className="py-2 px-2">{post.title}</td>
               <td className="py-2 px-2 text-gray-700">{post.author}</td>
               <td className="py-2 px-2 text-sm text-gray-500">{post.date}</td>
-              <td className="py-2 px-2 space-x-2">
-                <button className="text-sm text-blue-600 hover:underline">
-                  Edit
-                </button>
-                <button className="text-sm text-red-600 hover:underline">
+              <td className="py-2 px-2">
+                <button
+                  onClick={() => onRemovePost(post)}
+                  className="text-sm text-red-600 hover:underline"
+                >
                   Remove
                 </button>
               </td>
@@ -486,8 +539,8 @@ function Posts({ data }) {
   );
 }
 
-// Comments Section
-function Comments({ data }) {
+// Comments component with remove comment functionality
+function Comments({ data, onRemoveComment }) {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Comments</h2>
@@ -509,7 +562,10 @@ function Comments({ data }) {
                 {comment.date}
               </td>
               <td className="py-2 px-2">
-                <button className="text-sm text-red-600 hover:underline">
+                <button
+                  onClick={() => onRemoveComment(comment)}
+                  className="text-sm text-red-600 hover:underline"
+                >
                   Remove
                 </button>
               </td>
@@ -521,15 +577,14 @@ function Comments({ data }) {
   );
 }
 
-// Reports Section
-function Reports({ data }) {
+// Reports component
+function Reports({ data, onResolveReport, onRemoveReport }) {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Reports</h2>
       <table className="w-full text-left border-collapse">
         <thead>
           <tr className="border-b">
-            <th className="py-2 px-2 text-sm text-gray-600">Item Type</th>
             <th className="py-2 px-2 text-sm text-gray-600">Title</th>
             <th className="py-2 px-2 text-sm text-gray-600">Reason</th>
             <th className="py-2 px-2 text-sm text-gray-600">Date</th>
@@ -539,15 +594,22 @@ function Reports({ data }) {
         <tbody>
           {data.map((report) => (
             <tr key={report.id} className="border-b">
-              <td className="py-2 px-2">{report.itemType}</td>
-              <td className="py-2 px-2">{report.itemTitle}</td>
+              <td className="py-2 px-2">{report.title}</td>
               <td className="py-2 px-2 text-gray-700">{report.reason}</td>
               <td className="py-2 px-2 text-sm text-gray-500">{report.date}</td>
               <td className="py-2 px-2 space-x-2">
-                <button className="text-sm text-blue-600 hover:underline">
-                  Resolve
-                </button>
-                <button className="text-sm text-red-600 hover:underline">
+                {!report.resolved && (
+                  <button
+                    onClick={() => onResolveReport(report)}
+                    className="text-sm text-blue-600 hover:underline"
+                  >
+                    Resolve
+                  </button>
+                )}
+                <button
+                  onClick={() => onRemoveReport(report)}
+                  className="text-sm text-red-600 hover:underline"
+                >
                   Remove
                 </button>
               </td>
@@ -559,7 +621,7 @@ function Reports({ data }) {
   );
 }
 
-// Feedback Section Component – new tab for feedback data.
+// Feedback component
 function Feedback({ data }) {
   return (
     <div>

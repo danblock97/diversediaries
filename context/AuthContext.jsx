@@ -53,24 +53,40 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Profile creation logic using auth metadata.
-  // This upsert ensures that a profile exists (or is updated) when the user signs in.
   useEffect(() => {
     const createProfileIfMissing = async () => {
       if (session?.user) {
         try {
           const { user } = session;
-          const display_name = user.user_metadata?.full_name || user.email;
-          const { error } = await supabase.from("profiles").upsert({
-            id: user.id,
-            bio: "",
-            profile_picture: "",
-            preferences: {},
-            display_name,
-            email: user.email,
-          });
-          if (error && error.code !== "23505") {
-            console.error("Error creating/upserting profile:", error.message);
+          // Check if profile exists
+          const { data: existingProfile, error: selectError } = await supabase
+            .from("profiles")
+            .select("id")
+            .eq("id", user.id)
+            .single();
+
+          if (selectError && selectError.code !== "PGRST116") {
+            console.error(
+              "Error checking profile existence:",
+              selectError.message,
+            );
+            return;
+          }
+
+          // Only create a profile if it doesn't exist
+          if (!existingProfile) {
+            const display_name = user.user_metadata?.full_name || user.email;
+            const { error } = await supabase.from("profiles").insert({
+              id: user.id,
+              bio: "",
+              profile_picture: "",
+              preferences: {},
+              display_name,
+              email: user.email,
+            });
+            if (error) {
+              console.error("Error creating profile:", error.message);
+            }
           }
         } catch (err) {
           console.error("Profile creation error:", err.message);

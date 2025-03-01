@@ -23,6 +23,7 @@ export default function AdminPage() {
   const [posts, setPosts] = useState([]);
   const [comments, setComments] = useState([]);
   const [reports, setReports] = useState([]);
+  const [feedback, setFeedback] = useState([]);
 
   // State for ban modal
   const [banModalOpen, setBanModalOpen] = useState(false);
@@ -62,20 +63,18 @@ export default function AdminPage() {
     fetchPosts();
     fetchComments();
     fetchReports();
+    fetchFeedback();
   }, [adminChecked, isAdmin]);
 
   // Data fetching functions
 
   async function fetchOverviewData() {
-    // Count total posts
     const { count: postsCount } = await supabase
       .from("posts")
       .select("*", { count: "exact", head: true });
-    // Count reported items (assuming a reports table exists)
     const { count: reportsCount } = await supabase
       .from("reports")
       .select("*", { count: "exact", head: true });
-    // Count active (non-banned) users from profiles
     const { count: activeUsersCount } = await supabase
       .from("profiles")
       .select("*", { count: "exact", head: true })
@@ -102,7 +101,6 @@ export default function AdminPage() {
   }
 
   async function fetchPosts() {
-    // Fetch posts without join since no FK relationship exists
     const { data: postsData, error: postsError } = await supabase
       .from("posts")
       .select("id, title, created_at, user_id");
@@ -110,7 +108,6 @@ export default function AdminPage() {
       console.error("Error fetching posts:", JSON.stringify(postsError));
       return;
     }
-    // Extract unique user IDs from posts
     const userIds = [...new Set(postsData.map((post) => post.user_id))];
     let authorsLookup = {};
     if (userIds.length > 0) {
@@ -139,7 +136,6 @@ export default function AdminPage() {
   }
 
   async function fetchComments() {
-    // Fetch comments without join
     const { data: commentsData, error: commentsError } = await supabase
       .from("comments")
       .select("id, content, created_at, user_id");
@@ -147,7 +143,6 @@ export default function AdminPage() {
       console.error("Error fetching comments:", JSON.stringify(commentsError));
       return;
     }
-    // Extract unique user IDs from comments
     const userIds = [
       ...new Set(commentsData.map((comment) => comment.user_id)),
     ];
@@ -196,6 +191,18 @@ export default function AdminPage() {
     setReports(formattedReports);
   }
 
+  async function fetchFeedback() {
+    const { data, error } = await supabase
+      .from("feedback")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("Error fetching feedback:", JSON.stringify(error));
+      return;
+    }
+    setFeedback(data);
+  }
+
   // Function to open the ban modal for a specific user.
   const handleBanUser = (user) => {
     setSelectedUserToBan(user);
@@ -212,14 +219,13 @@ export default function AdminPage() {
     if (error) {
       console.error("Error banning user:", error.message);
     } else {
-      // Re-fetch users to update the list.
       fetchUsers();
     }
     setBanModalOpen(false);
     setSelectedUserToBan(null);
   };
 
-  // New function to unban a user.
+  // Function to unban a user.
   const handleUnbanUser = async (user) => {
     const { error } = await supabase
       .from("profiles")
@@ -298,6 +304,14 @@ export default function AdminPage() {
           >
             Reports
           </button>
+          <button
+            onClick={() => setActiveTab("feedback")}
+            className={`text-left px-3 py-2 rounded hover:bg-gray-100 ${
+              activeTab === "feedback" ? "bg-gray-200 font-semibold" : ""
+            }`}
+          >
+            Feedback
+          </button>
         </nav>
       </aside>
 
@@ -320,6 +334,7 @@ export default function AdminPage() {
         {activeTab === "posts" && <Posts data={posts} />}
         {activeTab === "comments" && <Comments data={comments} />}
         {activeTab === "reports" && <Reports data={reports} />}
+        {activeTab === "feedback" && <Feedback data={feedback} />}
       </main>
     </div>
   );
@@ -537,6 +552,47 @@ function Reports({ data }) {
               </td>
             </tr>
           ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Feedback Section Component – new tab for feedback data.
+function Feedback({ data }) {
+  return (
+    <div>
+      <h2 className="text-2xl font-bold mb-6">Feedback</h2>
+      <table className="w-full text-left border-collapse">
+        <thead>
+          <tr className="border-b">
+            <th className="py-2 px-2 text-sm text-gray-600">Display Name</th>
+            <th className="py-2 px-2 text-sm text-gray-600">Email</th>
+            <th className="py-2 px-2 text-sm text-gray-600">Feedback</th>
+            <th className="py-2 px-2 text-sm text-gray-600">Submitted At</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.length === 0 ? (
+            <tr>
+              <td className="py-2 px-2" colSpan="4">
+                No feedback available.
+              </td>
+            </tr>
+          ) : (
+            data.map((item) => (
+              <tr key={item.id} className="border-b">
+                <td className="py-2 px-2">
+                  {item.display_name || "Anonymous"}
+                </td>
+                <td className="py-2 px-2">{item.email || "No email"}</td>
+                <td className="py-2 px-2">{item.feedback}</td>
+                <td className="py-2 px-2">
+                  {new Date(item.created_at).toLocaleDateString()}
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>

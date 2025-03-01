@@ -41,7 +41,6 @@ export function AuthProvider({ children }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
-      console.log("Auth state change:", event);
       setSession(newSession);
       setLoading(false);
       if (event === "TOKEN_REFRESHED" || event === "SIGNED_IN") {

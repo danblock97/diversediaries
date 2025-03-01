@@ -28,6 +28,10 @@ export default function Header() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const toggleDropdown = () => setDropdownOpen(!dropdownOpen);
 
+  // Mobile menu state for non-authenticated header
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
+
   // Fetch the profile to set isAdmin and profilePicture.
   useEffect(() => {
     async function fetchProfileData() {
@@ -118,7 +122,7 @@ export default function Header() {
   // Authenticated Header
   if (user) {
     return (
-      <header className="w-full border-b border-gray-200 px-8 py-4 flex items-center justify-between relative">
+      <header className="w-full border-b border-gray-200 px-4 md:px-8 py-4 flex flex-wrap items-center justify-between relative">
         {/* Left side: Logo + search */}
         <div className="flex items-center space-x-4">
           <div className="logo text-2xl font-bold">
@@ -264,7 +268,7 @@ export default function Header() {
               onClick={toggleDropdown}
             />
             {dropdownOpen && (
-              <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded shadow-md">
+              <div className="absolute right-0 mt-2 w-48 max-w-[90vw] bg-white border border-gray-200 rounded shadow-md">
                 <Link href="/dashboard">
                   <div
                     onClick={() => setDropdownOpen(false)}
@@ -301,11 +305,11 @@ export default function Header() {
     );
   }
 
-  // Non-authenticated Header
+  // Non-authenticated Header with responsive mobile menu
   return (
-    <header className="w-full border-b border-gray-200 px-8 py-4 flex items-center justify-between relative">
+    <header className="w-full border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between relative">
       <div className="logo text-2xl font-bold">Diverse Diaries</div>
-      <nav className="space-x-4">
+      <nav className="hidden md:flex space-x-4">
         <a href="#" className="hover:underline">
           Our Story
         </a>
@@ -329,6 +333,55 @@ export default function Header() {
           Get started
         </button>
       </nav>
+      <div className="md:hidden">
+        <button onClick={toggleMobileMenu}>
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 6h16M4 12h16M4 18h16"
+            />
+          </svg>
+        </button>
+      </div>
+      {mobileMenuOpen && (
+        <div className="absolute top-full left-0 w-full bg-white border-t border-gray-200 p-4 flex flex-col space-y-2 md:hidden">
+          <a href="#" className="hover:underline">
+            Our Story
+          </a>
+          <a href="#" className="hover:underline">
+            Membership
+          </a>
+          <a href="#" className="hover:underline">
+            Write
+          </a>
+          <a
+            href="#"
+            onClick={() => {
+              openModal();
+              setMobileMenuOpen(false);
+            }}
+            className="hover:underline cursor-pointer"
+          >
+            Sign in
+          </a>
+          <button
+            onClick={() => {
+              openModal();
+              setMobileMenuOpen(false);
+            }}
+            className="bg-black text-white px-4 py-2 rounded-full"
+          >
+            Get started
+          </button>
+        </div>
+      )}
       <AuthModal isOpen={modalOpen} onClose={closeModal} />
     </header>
   );

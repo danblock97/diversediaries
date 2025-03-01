@@ -225,12 +225,12 @@ export default function PostDetail({ id }) {
   const ReportModal = () => {
     if (!reportModalOpen) return null;
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
         <div
           className="absolute inset-0 bg-black opacity-50"
           onClick={() => setReportModalOpen(false)}
         />
-        <div className="relative bg-white rounded-lg p-6 max-w-md mx-auto">
+        <div className="relative bg-white rounded-lg p-6 max-w-md w-full mx-auto">
           <h3 className="text-xl font-bold mb-4">Report Post</h3>
           <p className="mb-4">
             Please let us know why you are reporting this post.
@@ -291,8 +291,6 @@ export default function PostDetail({ id }) {
         console.error("❌ Error inserting comment:", commentError);
       }
 
-      console.log("✅ Comment inserted successfully:", insertedComment);
-
       // Notify post author if someone (not the author) comments on their post
       if (post?.user_id && post.user_id !== user.id) {
         const notificationMessage = `Someone commented on your post: "${newComment
@@ -330,8 +328,6 @@ export default function PostDetail({ id }) {
               is_read: false,
             },
           ]);
-
-          console.log("✅ Reply notification sent to:", parentComment.user_id);
         }
       }
 
@@ -356,15 +352,15 @@ export default function PostDetail({ id }) {
     );
     processed = processed.replace(
       /<p>/g,
-      '<p class="text-lg text-gray-800 mb-7 leading-relaxed font-serif">',
+      '<p class="text-base sm:text-lg text-gray-800 mb-7 leading-relaxed font-serif">',
     );
     processed = processed.replace(
       /<h2>/g,
-      '<h2 class="text-3xl font-serif font-bold mt-12 mb-6 text-gray-900">',
+      '<h2 class="text-2xl sm:text-3xl font-serif font-bold mt-12 mb-6 text-gray-900">',
     );
     processed = processed.replace(
       /<h3>/g,
-      '<h3 class="text-2xl font-serif font-bold mt-10 mb-4 text-gray-900">',
+      '<h3 class="text-xl sm:text-2xl font-serif font-bold mt-10 mb-4 text-gray-900">',
     );
     processed = processed.replace(
       /<a /g,
@@ -387,7 +383,7 @@ export default function PostDetail({ id }) {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-[60vh]">
+      <div className="flex justify-center items-center min-h-[60vh] overflow-x-hidden">
         <LoadingAnimation />
       </div>
     );
@@ -402,7 +398,7 @@ export default function PostDetail({ id }) {
   }
 
   return (
-    <div className="bg-white min-h-screen">
+    <div className="bg-white min-h-screen overflow-x-hidden">
       {ReportModal()}
       <header className="py-16 bg-gradient-to-b from-gray-50 to-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -416,10 +412,9 @@ export default function PostDetail({ id }) {
               </span>
             ))}
           </div>
-          <h1 className="text-4xl sm:text-5xl font-serif font-bold text-gray-900 leading-tight mb-4">
+          <h1 className="text-3xl sm:text-4xl font-serif font-bold text-gray-900 leading-tight mb-4">
             {post.title}
           </h1>
-          {/* Wrap the author block in a Link so clicking it goes to the public profile */}
           <Link href={`/profile/${post.user_id}`}>
             <div className="flex items-center cursor-pointer">
               <div className="flex-shrink-0 h-12 w-12 bg-gray-300 rounded-full overflow-hidden">
@@ -461,7 +456,7 @@ export default function PostDetail({ id }) {
           className="article-content font-serif"
           dangerouslySetInnerHTML={{ __html: processContent(post.content) }}
         />
-        <div className="mt-8 flex items-center justify-end space-x-4">
+        <div className="mt-8 flex flex-wrap items-center justify-end gap-4">
           <LikeButton postId={id} userId={user?.id} />
           <button
             onClick={openReportModal}
@@ -517,7 +512,7 @@ export default function PostDetail({ id }) {
             onChange={(e) => setNewComment(e.target.value)}
             disabled={!user}
           />
-          <div className="mt-4 flex justify-between items-center">
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
             {replyingTo && (
               <button
                 className="px-4 py-2 text-gray-600 hover:text-gray-800"

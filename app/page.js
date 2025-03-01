@@ -25,10 +25,11 @@ function CategoriesNav({ selectedCategory, onSelect }) {
   }, []);
 
   return (
-    <nav className="flex items-center space-x-4 text-sm text-gray-600 mb-8">
+    // Added overflow-x-auto and whitespace-nowrap for horizontal scrolling on mobile
+    <nav className="overflow-x-auto whitespace-nowrap flex items-center space-x-4 text-sm text-gray-600 mb-8 px-2">
       <button
         onClick={() => onSelect(null)}
-        className={`hover:underline ${selectedCategory === null ? "font-bold" : ""}`}
+        className={`hover:underline flex-shrink-0 ${selectedCategory === null ? "font-bold" : ""}`}
       >
         All
       </button>
@@ -36,7 +37,7 @@ function CategoriesNav({ selectedCategory, onSelect }) {
         <button
           key={cat.id}
           onClick={() => onSelect(cat.id)}
-          className={`hover:underline ${selectedCategory === cat.id ? "font-bold" : ""}`}
+          className={`hover:underline flex-shrink-0 ${selectedCategory === cat.id ? "font-bold" : ""}`}
         >
           {cat.name}
         </button>
@@ -295,15 +296,15 @@ function calculateReadTime(content) {
   return Math.ceil(wordCount / wordsPerMinute);
 }
 
-// HeroSection remains unchanged.
+// HeroSection remains largely unchanged; its flex direction reverses on mobile.
 function HeroSection() {
   return (
     <section className="max-w-7xl mx-auto flex flex-col-reverse md:flex-row items-center justify-center gap-8 px-4 py-12 md:py-20 h-screen">
       <div className="md:w-1/2 md:pr-8 mt-8 md:mt-0">
-        <h1 className="text-6xl md:text-7xl font-bold mb-4 leading-tight">
+        <h1 className="text-4xl md:text-6xl font-bold mb-4 leading-tight">
           Diverse Diaries
         </h1>
-        <p className="text-xl md:text-xl text-gray-700 mb-6">
+        <p className="text-lg md:text-xl text-gray-700 mb-6">
           Discover inspiring stories and insights.
         </p>
         <button className="bg-black text-white px-6 py-3 rounded-full">
@@ -326,7 +327,7 @@ export default function Home() {
   if (!user) return <HeroSection />;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-12 min-h-screen">
+    <div className="max-w-7xl mx-auto px-4 py-12 min-h-screen overflow-x-hidden">
       <CategoriesNav
         selectedCategory={selectedCategory}
         onSelect={setSelectedCategory}

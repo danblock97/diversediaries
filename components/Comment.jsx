@@ -9,8 +9,8 @@ const Comment = ({ comment, isReply = false, onReply }) => {
         isReply ? "border-l-4 border-gray-200 pl-4" : "shadow-sm"
       } p-6 mb-4`}
     >
-      <div className="flex items-start">
-        <div className="flex-shrink-0 w-10 h-10 bg-gray-300 rounded-full overflow-hidden mr-4">
+      <div className="flex flex-col sm:flex-row items-start">
+        <div className="flex-shrink-0 w-10 h-10 bg-gray-300 rounded-full overflow-hidden mb-4 sm:mb-0 sm:mr-4">
           {comment.profiles?.avatar_url ? (
             <img
               src={comment.profiles.avatar_url}
@@ -25,7 +25,7 @@ const Comment = ({ comment, isReply = false, onReply }) => {
         </div>
 
         <div className="flex-1">
-          <div className="flex justify-between items-center mb-2">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2">
             <div>
               <p className="font-medium text-gray-900">{name}</p>
               <p className="text-xs text-gray-500">
@@ -37,7 +37,7 @@ const Comment = ({ comment, isReply = false, onReply }) => {
               </p>
             </div>
           </div>
-          <div className="prose prose-sm max-w-none">
+          <div className="prose prose-sm max-w-full">
             <p className="text-gray-800 whitespace-pre-line">
               {comment.content}
             </p>

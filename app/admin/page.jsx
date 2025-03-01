@@ -200,6 +200,7 @@ export default function AdminPage() {
       console.error("Error fetching feedback:", JSON.stringify(error));
       return;
     }
+    console.log("Feedback data fetched:", data);
     setFeedback(data);
   }
 

@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabaseClient"; // Use the preconfigured Supabase client
+import Image from "next/image";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function FeedbackModal({
   isOpen,
   onClose,
   onFeedbackSubmitted,
-  user,
 }) {
+  const { user } = useAuth(); // Get the current user from context
   const [categoryName, setCategoryName] = useState("");
   const [feedback, setFeedback] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,7 +23,6 @@ export default function FeedbackModal({
       setError("Please provide details about the category you'd like to see.");
       return;
     }
-
     if (!user || !user.id) {
       setError("User not authenticated. Please log in.");
       return;
@@ -29,18 +30,31 @@ export default function FeedbackModal({
 
     setLoading(true);
     setError("");
+
     try {
+      // Fetch the user's profile info from the profiles table
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("display_name, email")
+        .eq("id", user.id)
+        .single();
+
+      if (profileError || !profile) {
+        throw new Error("Failed to retrieve profile information.");
+      }
+
       let fullFeedback = feedback;
       if (categoryName.trim()) {
         fullFeedback = `Category Name: ${categoryName}\nWhy it's useful: ${feedback}`;
       }
-      // Insert directly into the "feedback" table using the client that carries the auth token
+
+      // Insert feedback using the profile's display_name and email
       const { error } = await supabase.from("feedback").insert([
         {
           feedback: fullFeedback,
           user_id: user.id,
-          email: user.email || null,
-          display_name: user.user_metadata?.full_name || null,
+          email: profile.email || null,
+          display_name: profile.display_name || null,
         },
       ]);
       if (error) {
@@ -57,12 +71,13 @@ export default function FeedbackModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Blurred overlay */}
       <div
         className="absolute inset-0 bg-opacity-75 backdrop-blur-sm"
         onClick={onClose}
       ></div>
       <div className="relative bg-white rounded-xl shadow-2xl max-w-4xl w-full overflow-hidden flex flex-col md:flex-row">
-        {/* Left column with image */}
+        {/* Left side with image */}
         <div className="md:w-2/5 bg-blue-50 p-6 flex items-center justify-center">
           <div className="relative w-full h-40 md:h-full max-h-64 md:max-h-none">
             <img
@@ -72,8 +87,7 @@ export default function FeedbackModal({
             />
           </div>
         </div>
-
-        {/* Right column with content */}
+        {/* Right side with form */}
         <div className="md:w-3/5 p-8">
           <button
             onClick={onClose}
@@ -95,7 +109,6 @@ export default function FeedbackModal({
               />
             </svg>
           </button>
-
           <div className="mb-6">
             <h2 className="text-2xl font-serif font-bold text-gray-900 mb-2">
               Suggest a New Category
@@ -105,7 +118,6 @@ export default function FeedbackModal({
               categories that would better represent your content.
             </p>
           </div>
-
           <div className="space-y-4">
             <div>
               <label
@@ -117,13 +129,12 @@ export default function FeedbackModal({
               <input
                 id="category-name"
                 type="text"
-                className="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full border border-gray-300 p-3 rounded-md text-lg mb-4"
                 placeholder="e.g., Technology, Personal Growth"
                 value={categoryName}
                 onChange={(e) => setCategoryName(e.target.value)}
               />
             </div>
-
             <div>
               <label
                 htmlFor="category-description"
@@ -140,7 +151,6 @@ export default function FeedbackModal({
                 onChange={(e) => setFeedback(e.target.value)}
               ></textarea>
             </div>
-
             {error && (
               <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded">
                 <div className="flex">
@@ -164,7 +174,6 @@ export default function FeedbackModal({
                 </div>
               </div>
             )}
-
             <div className="flex justify-end space-x-4 pt-4">
               <button
                 onClick={onClose}

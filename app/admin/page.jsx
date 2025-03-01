@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
@@ -23,6 +23,10 @@ export default function AdminPage() {
   const [posts, setPosts] = useState([]);
   const [comments, setComments] = useState([]);
   const [reports, setReports] = useState([]);
+
+  // State for ban modal
+  const [banModalOpen, setBanModalOpen] = useState(false);
+  const [selectedUserToBan, setSelectedUserToBan] = useState(null);
 
   // Admin check effect: always runs.
   useEffect(() => {
@@ -75,7 +79,7 @@ export default function AdminPage() {
     const { count: activeUsersCount } = await supabase
       .from("profiles")
       .select("*", { count: "exact", head: true })
-      .eq("banned", false);
+      .eq("is_banned", false);
 
     setTotalPosts(postsCount || 0);
     setReportedItems(reportsCount || 0);
@@ -92,7 +96,7 @@ export default function AdminPage() {
       id: u.id,
       name: u.display_name || "No name",
       email: u.email || "No email",
-      banned: u.banned ?? false,
+      is_banned: u.is_banned ?? false,
     }));
     setUsers(formattedUsers);
   }
@@ -192,6 +196,42 @@ export default function AdminPage() {
     setReports(formattedReports);
   }
 
+  // Function to open the ban modal for a specific user.
+  const handleBanUser = (user) => {
+    setSelectedUserToBan(user);
+    setBanModalOpen(true);
+  };
+
+  // Function to update the profile and ban the user.
+  const confirmBanUser = async () => {
+    if (!selectedUserToBan) return;
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_banned: true })
+      .eq("id", selectedUserToBan.id);
+    if (error) {
+      console.error("Error banning user:", error.message);
+    } else {
+      // Re-fetch users to update the list.
+      fetchUsers();
+    }
+    setBanModalOpen(false);
+    setSelectedUserToBan(null);
+  };
+
+  // New function to unban a user.
+  const handleUnbanUser = async (user) => {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ is_banned: false })
+      .eq("id", user.id);
+    if (error) {
+      console.error("Error unbanning user:", error.message);
+    } else {
+      fetchUsers();
+    }
+  };
+
   // Always render the same hook structure.
   if (!adminChecked) {
     return <div>Loading...</div>;
@@ -203,6 +243,17 @@ export default function AdminPage() {
 
   return (
     <div className="flex h-screen">
+      {/* Ban Confirmation Modal */}
+      <BanConfirmationModal
+        isOpen={banModalOpen}
+        onClose={() => {
+          setBanModalOpen(false);
+          setSelectedUserToBan(null);
+        }}
+        onConfirm={confirmBanUser}
+        user={selectedUserToBan}
+      />
+
       {/* Side Navigation */}
       <aside className="w-64 p-4 border-r border-gray-200 space-y-2">
         <h2 className="text-xl font-bold mb-4">Admin Dashboard</h2>
@@ -259,11 +310,49 @@ export default function AdminPage() {
             activeUsers={activeUsers}
           />
         )}
-        {activeTab === "users" && <Users data={users} />}
+        {activeTab === "users" && (
+          <Users
+            data={users}
+            onBanUser={handleBanUser}
+            onUnbanUser={handleUnbanUser}
+          />
+        )}
         {activeTab === "posts" && <Posts data={posts} />}
         {activeTab === "comments" && <Comments data={comments} />}
         {activeTab === "reports" && <Reports data={reports} />}
       </main>
+    </div>
+  );
+}
+
+// Ban Confirmation Modal Component
+function BanConfirmationModal({ isOpen, onClose, onConfirm, user }) {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-black opacity-50" onClick={onClose} />
+      <div className="relative bg-white rounded-lg p-6 max-w-sm mx-auto">
+        <h3 className="text-xl font-bold mb-4">Confirm Ban</h3>
+        <p className="mb-4">
+          Are you sure you want to ban {user?.name || "this user"}? This action
+          cannot be undone.
+        </p>
+        <div className="flex justify-end space-x-4">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded border hover:bg-gray-100"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700"
+          >
+            Ban User
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -291,8 +380,8 @@ function Overview({ totalPosts, reportedItems, activeUsers }) {
   );
 }
 
-// Users Section
-function Users({ data }) {
+// Users Section Component – now receives onBanUser and onUnbanUser callbacks.
+function Users({ data, onBanUser, onUnbanUser }) {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Users</h2>
@@ -311,19 +400,25 @@ function Users({ data }) {
               <td className="py-2 px-2">{user.name}</td>
               <td className="py-2 px-2 text-gray-700">{user.email}</td>
               <td className="py-2 px-2">
-                {user.banned ? (
+                {user.is_banned ? (
                   <span className="text-red-500 text-sm">Banned</span>
                 ) : (
                   <span className="text-green-500 text-sm">Active</span>
                 )}
               </td>
               <td className="py-2 px-2 space-x-2">
-                {user.banned ? (
-                  <button className="text-sm text-blue-600 hover:underline">
+                {user.is_banned ? (
+                  <button
+                    onClick={() => onUnbanUser(user)}
+                    className="text-sm text-blue-600 hover:underline"
+                  >
                     Unban
                   </button>
                 ) : (
-                  <button className="text-sm text-red-600 hover:underline">
+                  <button
+                    onClick={() => onBanUser(user)}
+                    className="text-sm text-red-600 hover:underline"
+                  >
                     Ban
                   </button>
                 )}

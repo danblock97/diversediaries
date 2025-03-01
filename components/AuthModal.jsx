@@ -3,16 +3,33 @@
 import { useState } from "react";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function AuthModal({ isOpen, onClose }) {
   const { signIn } = useAuth();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [banned, setBanned] = useState(false);
 
   const handleSubmit = async () => {
     if (!email) return;
     setLoading(true);
+
+    // Check if a profile with this email is banned.
+    const { data: profileData, error: profileError } = await supabase
+      .from("profiles")
+      .select("is_banned")
+      .eq("email", email)
+      .single();
+
+    if (profileData && profileData.is_banned) {
+      setBanned(true);
+      setLoading(false);
+      return;
+    }
+
+    // If not banned, send the magic link.
     const { error } = await signIn(email);
     setLoading(false);
     if (!error) {
@@ -36,24 +53,46 @@ export default function AuthModal({ isOpen, onClose }) {
           {/* Left Side: Text, Email Input & Button */}
           <div className="md:w-1/2 p-8 flex flex-col justify-center">
             <h2 className="text-2xl font-bold mb-4">Sign In</h2>
-            <p className="text-gray-700 mb-4">
-              Enter your email to receive a magic link.
-            </p>
-            <input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-gray-300 p-3 rounded-md text-lg mb-4"
-            />
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={loading || sent}
-              className="w-full bg-black text-white px-6 py-3 rounded-full disabled:opacity-50"
-            >
-              {loading ? "Sending..." : sent ? "Link Sent" : "Send Magic Link"}
-            </button>
+            {banned ? (
+              <>
+                <p className="text-gray-700 mb-4">
+                  Unfortunately, your account has been banned. For more
+                  information, please email{" "}
+                  <a
+                    href="mailto:danblock1997@hotmail.co.uk"
+                    className="underline text-blue-600"
+                  >
+                    Diverse Diaries Support
+                  </a>
+                  .
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-gray-700 mb-4">
+                  Enter your email to receive a magic link.
+                </p>
+                <input
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full border border-gray-300 p-3 rounded-md text-lg mb-4"
+                />
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={loading || sent}
+                  className="w-full bg-black text-white px-6 py-3 rounded-full disabled:opacity-50"
+                >
+                  {loading
+                    ? "Sending..."
+                    : sent
+                      ? "Link Sent"
+                      : "Send Magic Link"}
+                </button>
+              </>
+            )}
           </div>
 
           {/* Right Side: Hero Image */}

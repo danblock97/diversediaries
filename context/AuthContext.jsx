@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useRouter } from "next/navigation";
 
 const AuthContext = createContext({
   session: null,
@@ -17,6 +18,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const router = useRouter();
 
   // On mount, get the current session and listen for auth state changes.
   useEffect(() => {
@@ -53,6 +55,25 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Check if signed-in user is banned; if so, sign them out and redirect.
+  useEffect(() => {
+    async function checkBanned() {
+      if (session?.user) {
+        const { data, error } = await supabase
+          .from("profiles")
+          .select("is_banned")
+          .eq("id", session.user.id)
+          .single();
+        if (data?.is_banned) {
+          await supabase.auth.signOut();
+          router.push("/");
+        }
+      }
+    }
+    checkBanned();
+  }, [session, router]);
+
+  // Create profile if missing.
   useEffect(() => {
     const createProfileIfMissing = async () => {
       if (session?.user) {

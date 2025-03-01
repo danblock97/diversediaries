@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 
-// Dynamically import TipTap to avoid SSR issues
-const TiptapEditor = dynamic(() => import("@/components/TiptapEditor"), {
+// Dynamically import QuillEditor to avoid SSR issues
+const QuillEditor = dynamic(() => import("@/components/QuillEditor"), {
   ssr: false,
   loading: () => <p>Loading Editor...</p>,
 });
@@ -144,7 +144,7 @@ export default function NewPostPage() {
               >
                 Content
               </label>
-              <TiptapEditor value={content} onChange={setContent} />
+              <QuillEditor value={content} onChange={setContent} />
             </div>
             <div>
               <label className="block text-lg font-medium mb-2">

@@ -43,14 +43,14 @@ function CategoriesNav({ selectedCategory, onSelect }) {
   );
 }
 
-// Utility: Given an array of posts, fetch the corresponding profiles from the public profiles table.
-// We select only the columns that exist (e.g. id, avatar_url).
+// Utility: Given an array of posts, fetch the corresponding profiles from the profiles table.
+// Now we only include display_name along with id.
 async function mergeProfilesWithPosts(postsData) {
   const userIds = [...new Set(postsData.map((post) => post.user_id))];
 
   const { data: profilesData, error: profilesError } = await supabase
     .from("profiles")
-    .select("id, avatar_url")
+    .select("id, display_name")
     .in("id", userIds);
 
   if (profilesError) {
@@ -70,13 +70,11 @@ async function mergeProfilesWithPosts(postsData) {
 }
 
 // PostsFeed implements infinite scroll using Intersection Observer.
-// It also wraps each post in a Link to /posts/[id].
 function PostsFeed({ selectedCategory }) {
   const [posts, setPosts] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const pageSize = 10;
-  const { user } = useAuth();
   const observerRef = useRef();
   const fetchInProgress = useRef(false);
 
@@ -107,12 +105,11 @@ function PostsFeed({ selectedCategory }) {
     if (postsError) {
       console.error("Error fetching posts:", postsError.message);
     } else if (postsData) {
-      // Optionally, if you want to merge profile data, uncomment:
-      // const postsWithProfile = await mergeProfilesWithPosts(postsData);
-      // For now, we simply append postsData.
+      // Merge profile data to get display_name for each post.
+      const postsWithProfile = await mergeProfilesWithPosts(postsData);
       setPosts((prev) => {
         const existingIds = new Set(prev.map((p) => p.id));
-        const newPosts = postsData.filter((p) => !existingIds.has(p.id));
+        const newPosts = postsWithProfile.filter((p) => !existingIds.has(p.id));
         return [...prev, ...newPosts];
       });
       if (postsData.length < pageSize) setHasMore(false);
@@ -138,15 +135,14 @@ function PostsFeed({ selectedCategory }) {
   return (
     <div>
       {posts.map((post) => {
-        const authorName =
-          user && user.id === post.user_id ? user.email : "Anonymous";
+        // Now fetch display_name from the profile data instead of using user.email.
+        const authorName = post.profile?.display_name || "Anonymous";
         return (
           <Link key={post.id} href={`/posts/${post.id}`} className="block">
             <div className="flex flex-col border-b border-gray-200 pb-6 hover:bg-gray-50 transition">
               <p className="text-sm text-gray-500 mb-2">
-                {authorName} · {post.read_time || 5} min read
+                {authorName} · {calculateReadTime(post.content)} min read
               </p>
-
               <h2 className="text-xl font-semibold mb-2">{post.title}</h2>
               <p className="text-gray-700 mb-2">{post.excerpt}</p>
               <p className="text-sm text-gray-500 pb-2">
@@ -172,7 +168,6 @@ function PostsFeed({ selectedCategory }) {
 
 function DevPicks() {
   const [devPosts, setDevPosts] = useState([]);
-  const { user } = useAuth();
   const fetchInProgress = useRef(false);
 
   useEffect(() => {
@@ -190,8 +185,10 @@ function DevPicks() {
       if (postsError) {
         console.error("Error fetching dev picks:", postsError.message);
       } else if (postsData) {
+        // Merge profile data to fetch display_name for each dev pick.
+        const postsWithProfile = await mergeProfilesWithPosts(postsData);
         const uniquePosts = Array.from(
-          new Map(postsData.map((post) => [post.id, post])).values(),
+          new Map(postsWithProfile.map((post) => [post.id, post])).values(),
         );
         setDevPosts(uniquePosts);
       }
@@ -205,17 +202,14 @@ function DevPicks() {
       <h3 className="text-lg font-bold mb-3">Dev Picks</h3>
       <ul>
         {devPosts.map((post) => {
-          const authorName =
-            user && user.id === post.user_id ? user.email : "Anonymous";
+          // Use display_name from the profile for the dev pick as well.
+          const authorName = post.profile?.display_name || "Anonymous";
           return (
             <li key={post.id} className="mb-4">
-              {/* Display the user's name or email */}
               <p className="text-sm text-gray-500 mb-1">{authorName}</p>
-              {/* Post title in bold linking to the individual post */}
               <Link href={`/posts/${post.id}`} className="hover:underline">
                 <h4 className="font-bold text-lg">{post.title}</h4>
               </Link>
-              {/* Date published using created_at */}
               <p className="text-sm text-gray-500">
                 {new Date(post.created_at).toLocaleDateString()}
               </p>
@@ -225,6 +219,13 @@ function DevPicks() {
       </ul>
     </div>
   );
+}
+
+function calculateReadTime(content) {
+  if (!content) return 0;
+  const wordsPerMinute = 200;
+  const wordCount = content.split(/\s+/).filter(Boolean).length;
+  return Math.ceil(wordCount / wordsPerMinute);
 }
 
 // HeroSection remains unchanged.

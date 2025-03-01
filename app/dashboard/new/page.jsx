@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 // Dynamically import QuillEditor to avoid SSR issues
 const QuillEditor = dynamic(() => import("@/components/QuillEditor"), {
@@ -114,7 +115,7 @@ export default function NewPostPage() {
     <div className="max-w-3xl mx-auto px-4 py-12">
       {loading ? (
         <div className="flex items-center justify-center h-screen">
-          <p className="text-lg h-screen">Loading...</p>
+          <LoadingAnimation />
         </div>
       ) : (
         <>

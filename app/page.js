@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import PostLikes from "@/components/PostLikes";
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 // CategoriesNav acts as a filter.
 function CategoriesNav({ selectedCategory, onSelect }) {
@@ -316,7 +317,7 @@ export default function Home() {
   const { user, loading } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState(null);
 
-  if (loading) return <p className="text-lg h-screen">Loading...</p>;
+  if (loading) return <LoadingAnimation />;
   if (!user) return <HeroSection />;
 
   return (

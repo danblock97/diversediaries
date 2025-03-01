@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 export default function AdminPage() {
   const { user, loading } = useAuth();
@@ -290,7 +291,7 @@ export default function AdminPage() {
   };
 
   if (!adminChecked) {
-    return <div>Loading...</div>;
+    return <LoadingAnimation />;
   }
   if (!isAdmin) {
     return <div>Redirecting...</div>;

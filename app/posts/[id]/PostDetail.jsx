@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import FeedbackModal from "@/components/FeedbackModal";
 import LikeButton from "@/components/LikeButton";
 import Comment from "@/components/Comment";
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 export default function PostDetail({ id }) {
   const { user } = useAuth();
@@ -377,7 +378,7 @@ export default function PostDetail({ id }) {
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[60vh]">
-        <div className="animate-pulse text-lg">Loading post...</div>
+        <LoadingAnimation />
       </div>
     );
   }

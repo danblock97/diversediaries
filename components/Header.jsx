@@ -266,13 +266,19 @@ export default function Header() {
             {dropdownOpen && (
               <div className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded shadow-md">
                 <Link href="/dashboard">
-                  <div className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                  <div
+                    onClick={() => setDropdownOpen(false)}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
                     Your Dashboard
                   </div>
                 </Link>
                 {isAdmin && (
                   <Link href="/admin">
-                    <div className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                    <div
+                      onClick={() => setDropdownOpen(false)}
+                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
                       Admin Dashboard
                     </div>
                   </Link>

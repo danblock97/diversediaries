@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import AuthModal from "@/components/AuthModal";
 import { supabase } from "@/lib/supabaseClient";
@@ -9,7 +10,9 @@ import Link from "next/link";
 
 export default function Header() {
   const { user, signOut, loading } = useAuth();
+  const router = useRouter();
   const [isAdmin, setIsAdmin] = useState(false);
+  const [profilePicture, setProfilePicture] = useState(null);
   const [searchText, setSearchText] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [showResults, setShowResults] = useState(false);
@@ -24,9 +27,7 @@ export default function Header() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const toggleDropdown = () => setDropdownOpen(!dropdownOpen);
 
-  // Fetch the profile to set isAdmin.
-  // Note: The profile is already created (or updated) in AuthContext,
-  // so we simply fetch the profile without attempting to create it here.
+  // Fetch the profile to set isAdmin and profilePicture.
   useEffect(() => {
     async function fetchProfileData() {
       if (!user) return;
@@ -34,10 +35,10 @@ export default function Header() {
       try {
         const userId = user.id;
 
-        // Fetch the profile for the current user
+        // Fetch the profile for the current user, including profile_picture
         const { data, error } = await supabase
           .from("profiles")
-          .select("is_admin")
+          .select("is_admin, profile_picture")
           .eq("id", userId);
 
         if (error) {
@@ -47,6 +48,7 @@ export default function Header() {
 
         if (data && data.length > 0) {
           setIsAdmin(!!data[0].is_admin);
+          setProfilePicture(data[0].profile_picture);
         } else {
           setIsAdmin(false);
         }
@@ -199,7 +201,11 @@ export default function Header() {
           {/* Avatar Dropdown */}
           <div className="relative">
             <img
-              src={user.user_metadata?.avatar_url || "/images/hero.png"}
+              src={
+                profilePicture ||
+                user.user_metadata?.avatar_url ||
+                "/images/hero.png"
+              }
               alt="User Avatar"
               className="w-8 h-8 rounded-full object-cover cursor-pointer"
               onClick={toggleDropdown}
@@ -219,9 +225,10 @@ export default function Header() {
                   </Link>
                 )}
                 <button
-                  onClick={() => {
-                    signOut();
+                  onClick={async () => {
+                    await signOut();
                     setDropdownOpen(false);
+                    router.push("/");
                   }}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >

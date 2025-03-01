@@ -154,11 +154,13 @@ function PostsFeed({ selectedCategory }) {
         );
       })}
       {!hasMore && posts.length === 0 && (
-        <div className="py-8 text-center text-gray-500">
-          <p>
-            No posts found in this category. Try another filter or check back
-            later!
-          </p>
+        <div className="flex flex-col items-center justify-center py-8">
+          <img
+            src="/images/nodata.png"
+            alt="No Data"
+            className="w-48 h-auto mb-4"
+          />
+          <p className="text-lg text-gray-500">No posts found.</p>
         </div>
       )}
       <div ref={sentinelRef} />

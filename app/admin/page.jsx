@@ -1,66 +1,205 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/context/AuthContext";
 
 export default function AdminPage() {
+  // Always call these hooks
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  // Admin check state
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminChecked, setAdminChecked] = useState(false);
+
+  // Dashboard state hooks (always declared)
   const [activeTab, setActiveTab] = useState("overview");
+  const [totalPosts, setTotalPosts] = useState(0);
+  const [reportedItems, setReportedItems] = useState(0);
+  const [activeUsers, setActiveUsers] = useState(0);
+  const [users, setUsers] = useState([]);
+  const [posts, setPosts] = useState([]);
+  const [comments, setComments] = useState([]);
+  const [reports, setReports] = useState([]);
 
-  // Placeholder data for demonstration
-  const totalPosts = 123;
-  const reportedItems = 5;
-  const activeUsers = 50;
+  // Admin check effect: always runs.
+  useEffect(() => {
+    async function checkAdmin() {
+      if (!loading) {
+        if (!user) {
+          router.push("/");
+          setAdminChecked(true);
+        } else {
+          const { data, error } = await supabase
+            .from("profiles")
+            .select("is_admin")
+            .eq("id", user.id)
+            .maybeSingle();
 
-  const users = [
-    { id: 1, name: "John Doe", email: "john@example.com", banned: false },
-    { id: 2, name: "Jane Smith", email: "jane@example.com", banned: true },
-  ];
+          if (error || !data || !data.is_admin) {
+            router.push("/");
+          } else {
+            setIsAdmin(true);
+          }
+          setAdminChecked(true);
+        }
+      }
+    }
+    checkAdmin();
+  }, [user, loading, router]);
 
-  const posts = [
-    {
-      id: 1,
-      title: "Hello World",
-      author: "John Doe",
-      date: "July 10, 2026",
-    },
-    {
-      id: 2,
-      title: "Another Great Post",
-      author: "Jane Smith",
-      date: "July 12, 2026",
-    },
-  ];
+  // Data fetching effect: only runs after admin check completes.
+  useEffect(() => {
+    if (!adminChecked || !isAdmin) return;
+    fetchOverviewData();
+    fetchUsers();
+    fetchPosts();
+    fetchComments();
+    fetchReports();
+  }, [adminChecked, isAdmin]);
 
-  const comments = [
-    {
-      id: 1,
-      excerpt: "This is a fantastic article!",
-      author: "Commenter A",
-      date: "July 15, 2026",
-    },
-    {
-      id: 2,
-      excerpt: "I completely disagree with your premise.",
-      author: "Commenter B",
-      date: "July 16, 2026",
-    },
-  ];
+  // Data fetching functions
 
-  const reports = [
-    {
-      id: 1,
-      itemType: "Post",
-      itemTitle: "Offensive Post Title",
-      reason: "Hate speech",
-      date: "July 18, 2026",
-    },
-    {
-      id: 2,
-      itemType: "Comment",
-      itemTitle: "Some Comment Excerpt",
-      reason: "Harassment",
-      date: "July 19, 2026",
-    },
-  ];
+  async function fetchOverviewData() {
+    // Count total posts
+    const { count: postsCount } = await supabase
+      .from("posts")
+      .select("*", { count: "exact", head: true });
+    // Count reported items (assuming a reports table exists)
+    const { count: reportsCount } = await supabase
+      .from("reports")
+      .select("*", { count: "exact", head: true });
+    // Count active (non-banned) users from profiles
+    const { count: activeUsersCount } = await supabase
+      .from("profiles")
+      .select("*", { count: "exact", head: true })
+      .eq("banned", false);
+
+    setTotalPosts(postsCount || 0);
+    setReportedItems(reportsCount || 0);
+    setActiveUsers(activeUsersCount || 0);
+  }
+
+  async function fetchUsers() {
+    const { data, error } = await supabase.from("profiles").select("*");
+    if (error) {
+      console.error("Error fetching users:", error);
+      return;
+    }
+    const formattedUsers = data.map((u) => ({
+      id: u.id,
+      name: u.display_name || "No name",
+      email: u.email || "No email",
+      banned: u.banned ?? false,
+    }));
+    setUsers(formattedUsers);
+  }
+
+  async function fetchPosts() {
+    // Fetch posts without join since no FK relationship exists
+    const { data: postsData, error: postsError } = await supabase
+      .from("posts")
+      .select("id, title, created_at, user_id");
+    if (postsError) {
+      console.error("Error fetching posts:", JSON.stringify(postsError));
+      return;
+    }
+    // Extract unique user IDs from posts
+    const userIds = [...new Set(postsData.map((post) => post.user_id))];
+    let authorsLookup = {};
+    if (userIds.length > 0) {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", userIds);
+      if (profilesError) {
+        console.error(
+          "Error fetching post authors:",
+          JSON.stringify(profilesError),
+        );
+      } else {
+        profilesData.forEach((profile) => {
+          authorsLookup[profile.id] = profile.display_name;
+        });
+      }
+    }
+    const formattedPosts = postsData.map((post) => ({
+      id: post.id,
+      title: post.title,
+      author: authorsLookup[post.user_id] || "Unknown",
+      date: new Date(post.created_at).toLocaleDateString(),
+    }));
+    setPosts(formattedPosts);
+  }
+
+  async function fetchComments() {
+    // Fetch comments without join
+    const { data: commentsData, error: commentsError } = await supabase
+      .from("comments")
+      .select("id, content, created_at, user_id");
+    if (commentsError) {
+      console.error("Error fetching comments:", JSON.stringify(commentsError));
+      return;
+    }
+    // Extract unique user IDs from comments
+    const userIds = [
+      ...new Set(commentsData.map((comment) => comment.user_id)),
+    ];
+    let authorsLookup = {};
+    if (userIds.length > 0) {
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, display_name")
+        .in("id", userIds);
+      if (profilesError) {
+        console.error(
+          "Error fetching comment authors:",
+          JSON.stringify(profilesError),
+        );
+      } else {
+        profilesData.forEach((profile) => {
+          authorsLookup[profile.id] = profile.display_name;
+        });
+      }
+    }
+    const formattedComments = commentsData.map((comment) => ({
+      id: comment.id,
+      excerpt:
+        comment.content.length > 50
+          ? comment.content.slice(0, 50) + "..."
+          : comment.content,
+      author: authorsLookup[comment.user_id] || "Unknown",
+      date: new Date(comment.created_at).toLocaleDateString(),
+    }));
+    setComments(formattedComments);
+  }
+
+  async function fetchReports() {
+    const { data, error } = await supabase.from("reports").select("*");
+    if (error) {
+      console.error("Error fetching reports:", JSON.stringify(error));
+      return;
+    }
+    const formattedReports = data.map((r) => ({
+      id: r.id,
+      itemType: r.item_type,
+      itemTitle: r.item_title,
+      reason: r.reason,
+      date: new Date(r.created_at).toLocaleDateString(),
+    }));
+    setReports(formattedReports);
+  }
+
+  // Always render the same hook structure.
+  if (!adminChecked) {
+    return <div>Loading...</div>;
+  }
+
+  if (!isAdmin) {
+    return <div>Redirecting...</div>;
+  }
 
   return (
     <div className="flex h-screen">
@@ -129,7 +268,7 @@ export default function AdminPage() {
   );
 }
 
-/* Overview Section */
+// Overview Section
 function Overview({ totalPosts, reportedItems, activeUsers }) {
   return (
     <div>
@@ -152,7 +291,7 @@ function Overview({ totalPosts, reportedItems, activeUsers }) {
   );
 }
 
-/* Users Section */
+// Users Section
 function Users({ data }) {
   return (
     <div>
@@ -200,7 +339,7 @@ function Users({ data }) {
   );
 }
 
-/* Posts Section */
+// Posts Section
 function Posts({ data }) {
   return (
     <div>
@@ -236,7 +375,7 @@ function Posts({ data }) {
   );
 }
 
-/* Comments Section */
+// Comments Section
 function Comments({ data }) {
   return (
     <div>
@@ -271,7 +410,7 @@ function Comments({ data }) {
   );
 }
 
-/* Reports Section */
+// Reports Section
 function Reports({ data }) {
   return (
     <div>

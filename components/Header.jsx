@@ -287,7 +287,8 @@ export default function Header() {
 
           <a
             id="myCustomTrigger"
-            className="hover:underline font-medium flex items-center cursor-pointer pt-2"
+            className="hover:underline text-sm font-medium cursor-pointer pt-2"
+            onClick={() => setMobileMenuOpen(false)}
           >
             Report a Bug
           </a>

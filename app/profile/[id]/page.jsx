@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import PublicProfile from "@/components/PublicProfile";
-import LoadingAnimation from "@/components/LoadingAnimation"; // adjust the path as needed
+import LoadingAnimation from "@/components/LoadingAnimation";
 
 export default function ProfilePage() {
   const { id } = useParams();

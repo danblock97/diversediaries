@@ -14,7 +14,7 @@ export default function LoadingAnimation() {
       <p className="mt-4 text-gray-600 text-xl animate-pulse">
         Loading, please wait...
       </p>
-      <style jsx>{`
+      <style>{`
         @keyframes rotate {
           from {
             transform: rotate(0deg);

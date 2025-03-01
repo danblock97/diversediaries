@@ -49,9 +49,14 @@ export default function PostDetail({ id }) {
           .eq("id", id)
           .single();
 
-        if (postError)
-          throw new Error(postError.message || "Failed to fetch post");
-        if (!postData) throw new Error("Post not found");
+        if (postError) {
+          setError(postError.message || "Failed to fetch post");
+          return;
+        }
+        if (!postData) {
+          setError("Post not found");
+          return;
+        }
 
         // Calculate read time
         const wordCount = postData.content.split(/\s+/).length;
@@ -121,7 +126,12 @@ export default function PostDetail({ id }) {
         .select("*")
         .eq("post_id", id)
         .order("created_at", { ascending: false });
-      if (error) throw new Error(error.message || "Failed to fetch comments");
+      if (error) {
+        console.error("Error fetching comments:", error.message);
+        setComments([]);
+        setCommentThreads({});
+        return;
+      }
       if (!commentsData || commentsData.length === 0) {
         setComments([]);
         setCommentThreads({});
@@ -199,10 +209,11 @@ export default function PostDetail({ id }) {
           reason: reportReason.trim(),
         },
       ]);
-      if (error) throw error;
-      setReportModalOpen(false);
-      setReportReason("");
-      alert("Report submitted successfully.");
+      if (error) {
+        setReportModalOpen(false);
+        setReportReason("");
+        alert("Report submitted successfully.");
+      }
     } catch (err) {
       setReportError(err.message);
     } finally {
@@ -278,7 +289,6 @@ export default function PostDetail({ id }) {
 
       if (commentError) {
         console.error("❌ Error inserting comment:", commentError);
-        throw new Error(commentError.message);
       }
 
       console.log("✅ Comment inserted successfully:", insertedComment);

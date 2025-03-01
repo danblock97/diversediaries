@@ -30,7 +30,7 @@ export default function DashboardPage() {
   // UI states
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [setUploading] = useState(false);
   const [message, setMessage] = useState("");
 
   // For delete confirmation modal
@@ -86,7 +86,7 @@ export default function DashboardPage() {
     setUploading(true);
 
     const filePath = `profile-pictures/${user.id}/${file.name}`;
-    const { data, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from("media")
       .upload(filePath, file, {
         cacheControl: "3600",

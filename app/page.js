@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import PostLikes from "@/components/PostLikes";
@@ -153,10 +154,12 @@ function PostsFeed({ selectedCategory }) {
       })}
       {!hasMore && posts.length === 0 && (
         <div className="flex flex-col items-center justify-center py-8">
-          <img
+          <Image
             src="/images/nodata.png"
             alt="No Data"
             className="w-48 h-auto mb-4"
+            width={200}
+            height={200}
           />
           <p className="text-lg text-gray-500">No posts found.</p>
         </div>
@@ -256,10 +259,12 @@ function SuggestedAccounts() {
           <li key={account.id} className="flex items-center gap-4 mb-4">
             <Link href={`/profile/${account.id}`}>
               {account.profile_picture ? (
-                <img
+                <Image
                   src={account.profile_picture}
                   alt={account.display_name}
                   className="w-10 h-10 rounded-full object-cover"
+                  width={40}
+                  height={40}
                 />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
@@ -306,7 +311,7 @@ function HeroSection() {
         </button>
       </div>
       <div className="md:w-1/2 flex justify-center md:justify-start">
-        <img src="/images/hero.png" alt="Hero" width={600} height={400} />
+        <Image src="/images/hero.png" alt="Hero" width={600} height={400} />
       </div>
     </section>
   );

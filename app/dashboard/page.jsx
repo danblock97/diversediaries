@@ -22,6 +22,7 @@ export default function DashboardPage() {
     email: "",
     bio: "",
     profile_picture: "",
+    followers: [], // default to an empty array
   });
   // Posts state
   const [posts, setPosts] = useState([]);
@@ -35,14 +36,14 @@ export default function DashboardPage() {
   // For delete confirmation modal
   const [postToDelete, setPostToDelete] = useState(null);
 
-  // Fetch user profile
+  // Fetch user profile including follower count
   useEffect(() => {
     if (!user) return;
     async function fetchProfile() {
       setLoading(true);
       const { data, error } = await supabase
         .from("profiles")
-        .select("display_name, email, bio, profile_picture")
+        .select("display_name, email, bio, profile_picture, followers")
         .eq("id", user.id)
         .single();
       if (error) {
@@ -192,19 +193,23 @@ export default function DashboardPage() {
         {/* Left Column: Profile Settings */}
         <div className="w-1/3 space-y-4">
           <form onSubmit={handleSubmit}>
-            {/* Profile Picture */}
+            {/* Profile Picture & Follower Count */}
             <div className="relative group flex flex-col items-center mb-4">
               {profile.profile_picture ? (
                 <img
                   src={profile.profile_picture}
                   alt="Profile Picture"
-                  className="w-24 h-24 rounded-full object-cover mb-4"
+                  className="w-24 h-24 rounded-full object-cover mb-2"
                 />
               ) : (
-                <div className="w-24 h-24 rounded-full bg-gray-200 mb-4 flex items-center justify-center">
+                <div className="w-24 h-24 rounded-full bg-gray-200 mb-2 flex items-center justify-center">
                   No Image
                 </div>
               )}
+              {/* Follower Count */}
+              <p className="text-sm text-gray-600">
+                {profile.followers ? profile.followers.length : 0} Followers
+              </p>
               <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                 <label className="cursor-pointer">
                   <div className="bg-gray-700 bg-opacity-75 p-2 rounded-full">
@@ -322,8 +327,6 @@ export default function DashboardPage() {
                     {/* 4th line: Likes + Delete */}
                     <div className="flex items-center gap-4">
                       <PostLikes postId={post.id} />
-
-                      {/* Delete button opens the modal */}
                       <button
                         onClick={() => openDeleteModal(post.id)}
                         className="text-sm text-red-600 hover:underline"
@@ -352,19 +355,16 @@ export default function DashboardPage() {
       {postToDelete && (
         <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-md">
           <div className="bg-white p-6 rounded shadow-lg max-w-md w-full">
-            {/* Modal Image */}
             <img
               src="/images/hero.png"
               alt="Confirm Deletion"
               className="w-full h-auto mb-4 rounded"
             />
-
             <h2 className="text-xl font-semibold mb-2">Confirm Deletion</h2>
             <p className="mb-6">
               Are you sure you want to delete this post? This action cannot be
               undone.
             </p>
-
             <div className="flex justify-end space-x-4">
               <button
                 onClick={confirmDeletePost}

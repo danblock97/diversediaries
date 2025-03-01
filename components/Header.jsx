@@ -14,7 +14,8 @@ export default function Header() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [profilePicture, setProfilePicture] = useState(null);
   const [searchText, setSearchText] = useState("");
-  const [searchResults, setSearchResults] = useState([]);
+  // searchResults now contains separate arrays for posts and people
+  const [searchResults, setSearchResults] = useState({ posts: [], people: [] });
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef(null);
 
@@ -34,8 +35,6 @@ export default function Header() {
 
       try {
         const userId = user.id;
-
-        // Fetch the profile for the current user, including profile_picture
         const { data, error } = await supabase
           .from("profiles")
           .select("is_admin, profile_picture")
@@ -60,38 +59,45 @@ export default function Header() {
     fetchProfileData();
   }, [user]);
 
-  // Handle search input changes
+  // Handle search input changes: search both posts and people.
   const handleSearchChange = async (e) => {
     const query = e.target.value;
     setSearchText(query);
 
     if (query.length < 2) {
-      setSearchResults([]);
+      setSearchResults({ posts: [], people: [] });
       setShowResults(false);
       return;
     }
 
     try {
-      // Fetch posts that match the search query
-      const { data, error } = await supabase
+      // Query posts matching the title.
+      const { data: posts, error: postsError } = await supabase
         .from("posts")
         .select("id, title, user_id, created_at")
         .ilike("title", `%${query}%`)
         .order("created_at", { ascending: false })
         .limit(5);
 
-      if (error) {
-        console.error("Search error:", error);
-        return;
+      if (postsError) {
+        console.error("Search posts error:", postsError);
       }
 
-      if (!data || data.length === 0) {
-        setSearchResults([]);
-        setShowResults(true);
-        return;
+      // Query people matching the display name.
+      const { data: people, error: peopleError } = await supabase
+        .from("profiles")
+        .select("id, display_name, email, profile_picture")
+        .ilike("display_name", `%${query}%`)
+        .limit(5);
+
+      if (peopleError) {
+        console.error("Search people error:", peopleError);
       }
 
-      setSearchResults(data);
+      setSearchResults({
+        posts: posts || [],
+        people: people || [],
+      });
       setShowResults(true);
     } catch (err) {
       console.error("Search exception:", err);
@@ -105,7 +111,6 @@ export default function Header() {
         setShowResults(false);
       }
     }
-
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
@@ -136,54 +141,102 @@ export default function Header() {
               </svg>
               <input
                 type="text"
-                placeholder="Search posts"
+                placeholder="Search posts and people"
                 className="bg-transparent focus:outline-none text-sm w-32 md:w-48"
                 value={searchText}
                 onChange={handleSearchChange}
               />
             </div>
 
-            {showResults && searchResults.length > 0 && (
+            {showResults && (
               <div className="absolute mt-1 w-80 max-h-80 overflow-y-auto bg-white border border-gray-200 rounded shadow-md z-10">
-                {searchResults.map((post) => (
-                  <Link
-                    href={`/posts/${post.id}`}
-                    key={post.id}
-                    onClick={() => {
-                      setSearchText("");
-                      setShowResults(false);
-                    }}
-                  >
-                    <div className="block px-4 py-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0">
-                      <h4 className="font-bold text-base mb-1 truncate">
-                        {post.title}
-                      </h4>
-                      <div className="flex justify-between items-center text-sm text-gray-500">
-                        <span className="truncate max-w-[60%]">
-                          {user && post.user_id && user.id === post.user_id
-                            ? user.user_metadata?.display_name || user.email
-                            : "Anonymous"}
-                        </span>
-                        <span className="shrink-0">
-                          {post.created_at &&
-                            new Date(post.created_at).toLocaleDateString()}
-                        </span>
-                      </div>
+                {(searchResults.posts.length > 0 ||
+                  searchResults.people.length > 0) && (
+                  <div className="px-4 py-2">
+                    {searchResults.posts.length > 0 && (
+                      <>
+                        <p className="text-xs uppercase text-gray-400 mb-1">
+                          Posts
+                        </p>
+                        {searchResults.posts.map((post) => (
+                          <Link
+                            href={`/posts/${post.id}`}
+                            key={post.id}
+                            onClick={() => {
+                              setSearchText("");
+                              setShowResults(false);
+                            }}
+                          >
+                            <div className="block px-4 py-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0">
+                              <h4 className="font-bold text-base mb-1 truncate">
+                                {post.title}
+                              </h4>
+                              <div className="flex justify-between items-center text-sm text-gray-500">
+                                <span>Post</span>
+                                <span className="shrink-0">
+                                  {post.created_at &&
+                                    new Date(
+                                      post.created_at,
+                                    ).toLocaleDateString()}
+                                </span>
+                              </div>
+                            </div>
+                          </Link>
+                        ))}
+                      </>
+                    )}
+                    {searchResults.people.length > 0 && (
+                      <>
+                        <p className="text-xs uppercase text-gray-400 mt-2 mb-1">
+                          People
+                        </p>
+                        {searchResults.people.map((person) => (
+                          <Link
+                            href={`/profile/${person.id}`}
+                            key={person.id}
+                            onClick={() => {
+                              setSearchText("");
+                              setShowResults(false);
+                            }}
+                          >
+                            <div className="block px-4 py-3 hover:bg-gray-100 cursor-pointer border-b last:border-b-0">
+                              <div className="flex items-center gap-2">
+                                {person.profile_picture ? (
+                                  <img
+                                    src={person.profile_picture}
+                                    alt={person.display_name}
+                                    className="w-6 h-6 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs">
+                                    {person.display_name.charAt(0)}
+                                  </div>
+                                )}
+                                <h4 className="font-bold text-base truncate">
+                                  {person.display_name}
+                                </h4>
+                              </div>
+                              <p className="text-xs text-gray-500 truncate">
+                                {person.email}
+                              </p>
+                            </div>
+                          </Link>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {showResults &&
+                  searchText.length >= 2 &&
+                  searchResults.posts.length === 0 &&
+                  searchResults.people.length === 0 && (
+                    <div className="px-4 py-2 text-sm text-gray-500">
+                      No results found
                     </div>
-                  </Link>
-                ))}
+                  )}
               </div>
             )}
-
-            {showResults &&
-              searchResults.length === 0 &&
-              searchText.length >= 2 && (
-                <div className="absolute mt-1 w-64 bg-white border border-gray-200 rounded shadow-md z-10">
-                  <div className="px-4 py-2 text-sm text-gray-500">
-                    No results found
-                  </div>
-                </div>
-              )}
           </div>
         </div>
 

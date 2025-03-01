@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import FeedbackModal from "@/components/FeedbackModal";
@@ -281,9 +282,11 @@ export default function PostDetail({ id }) {
 
       console.log("✅ Comment inserted successfully:", insertedComment);
 
-      // 1️⃣ Notify the post author if someone (not the author) comments on their post
+      // Notify post author if someone (not the author) comments on their post
       if (post?.user_id && post.user_id !== user.id) {
-        const notificationMessage = `Someone commented on your post: "${newComment.trim().slice(0, 250)}..."`;
+        const notificationMessage = `Someone commented on your post: "${newComment
+          .trim()
+          .slice(0, 250)}..."`;
 
         await supabase.from("notifications").insert([
           {
@@ -295,7 +298,7 @@ export default function PostDetail({ id }) {
         ]);
       }
 
-      // 2️⃣ Notify the original commenter if the post author replies to their comment
+      // Notify original commenter if the post author replies to their comment
       if (replyingTo) {
         const { data: parentComment, error: parentError } = await supabase
           .from("comments")
@@ -304,7 +307,9 @@ export default function PostDetail({ id }) {
           .single();
 
         if (!parentError && parentComment?.user_id !== user.id) {
-          const replyMessage = `Someone replied to your comment: "${newComment.trim().slice(0, 250)}..."`;
+          const replyMessage = `Someone replied to your comment: "${newComment
+            .trim()
+            .slice(0, 250)}..."`;
 
           await supabase.from("notifications").insert([
             {
@@ -403,37 +408,41 @@ export default function PostDetail({ id }) {
           <h1 className="text-4xl sm:text-5xl font-serif font-bold text-gray-900 leading-tight mb-4">
             {post.title}
           </h1>
-          <div className="flex items-center">
-            <div className="flex-shrink-0 h-12 w-12 bg-gray-300 rounded-full overflow-hidden">
-              {post.profiles?.profile_picture ? (
-                <img
-                  src={post.profiles.profile_picture}
-                  alt="Author"
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="h-full w-full flex items-center justify-center bg-gray-200 text-gray-500">
-                  {post.profiles?.display_name?.charAt(0)?.toUpperCase() || "A"}
+          {/* Wrap the author block in a Link so clicking it goes to the public profile */}
+          <Link href={`/profile/${post.user_id}`}>
+            <div className="flex items-center cursor-pointer">
+              <div className="flex-shrink-0 h-12 w-12 bg-gray-300 rounded-full overflow-hidden">
+                {post.profiles?.profile_picture ? (
+                  <img
+                    src={post.profiles.profile_picture}
+                    alt="Author"
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="h-full w-full flex items-center justify-center bg-gray-200 text-gray-500">
+                    {post.profiles?.display_name?.charAt(0)?.toUpperCase() ||
+                      "A"}
+                  </div>
+                )}
+              </div>
+              <div className="ml-4">
+                <p className="text-base font-medium text-gray-900">
+                  {post.profiles?.display_name || "Anonymous"}
+                </p>
+                <div className="flex text-sm text-gray-500 items-center">
+                  <span>
+                    {new Date(post.created_at).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                  <span className="mx-1">•</span>
+                  <span>{readTime}</span>
                 </div>
-              )}
-            </div>
-            <div className="ml-4">
-              <p className="text-base font-medium text-gray-900">
-                {post.profiles?.display_name || "Anonymous"}
-              </p>
-              <div className="flex text-sm text-gray-500 items-center">
-                <span>
-                  {new Date(post.created_at).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
-                </span>
-                <span className="mx-1">•</span>
-                <span>{readTime}</span>
               </div>
             </div>
-          </div>
+          </Link>
         </div>
       </header>
       <article className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

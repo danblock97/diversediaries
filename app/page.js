@@ -44,7 +44,6 @@ function CategoriesNav({ selectedCategory, onSelect }) {
 }
 
 // Utility: Given an array of posts, fetch the corresponding profiles from the profiles table.
-// Now we only include display_name along with id.
 async function mergeProfilesWithPosts(postsData) {
   const userIds = [...new Set(postsData.map((post) => post.user_id))];
 
@@ -105,7 +104,6 @@ function PostsFeed({ selectedCategory }) {
     if (postsError) {
       console.error("Error fetching posts:", postsError.message);
     } else if (postsData) {
-      // Merge profile data to get display_name for each post.
       const postsWithProfile = await mergeProfilesWithPosts(postsData);
       setPosts((prev) => {
         const existingIds = new Set(prev.map((p) => p.id));
@@ -135,7 +133,6 @@ function PostsFeed({ selectedCategory }) {
   return (
     <div>
       {posts.map((post) => {
-        // Now fetch display_name from the profile data instead of using user.email.
         const authorName = post.profile?.display_name || "Anonymous";
         return (
           <Link key={post.id} href={`/posts/${post.id}`} className="block">
@@ -187,7 +184,6 @@ function DevPicks() {
       if (postsError) {
         console.error("Error fetching dev picks:", postsError.message);
       } else if (postsData) {
-        // Merge profile data to fetch display_name for each dev pick.
         const postsWithProfile = await mergeProfilesWithPosts(postsData);
         const uniquePosts = Array.from(
           new Map(postsWithProfile.map((post) => [post.id, post])).values(),
@@ -200,15 +196,20 @@ function DevPicks() {
   }, []);
 
   return (
-    <div className="p-4 border border-gray-200 rounded">
+    <div className="p-4">
       <h3 className="text-lg font-bold mb-3">Dev Picks</h3>
       <ul>
         {devPosts.map((post) => {
-          // Use display_name from the profile for the dev pick as well.
           const authorName = post.profile?.display_name || "Anonymous";
           return (
             <li key={post.id} className="mb-4">
-              <p className="text-sm text-gray-500 mb-1">{authorName}</p>
+              {/* Wrap the author name in a link to their profile */}
+              <Link
+                href={`/profile/${post.user_id}`}
+                className="text-sm text-gray-500 mb-1 hover:underline"
+              >
+                {authorName}
+              </Link>
               <Link href={`/posts/${post.id}`} className="hover:underline">
                 <h4 className="font-bold text-lg">{post.title}</h4>
               </Link>
@@ -218,6 +219,64 @@ function DevPicks() {
             </li>
           );
         })}
+      </ul>
+    </div>
+  );
+}
+
+// New Component: SuggestedAccounts
+function SuggestedAccounts() {
+  const { user } = useAuth();
+  const [accounts, setAccounts] = useState([]);
+
+  useEffect(() => {
+    async function fetchSuggestedAccounts() {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, display_name, email, profile_picture, followers")
+        .neq("id", user?.id)
+        .limit(5);
+      if (!error) {
+        setAccounts(data);
+      } else {
+        console.error("Error fetching suggested accounts:", error.message);
+      }
+    }
+    fetchSuggestedAccounts();
+  }, [user]);
+
+  if (accounts.length === 0) return null;
+
+  return (
+    <div className="p-4">
+      <h3 className="text-lg font-bold mb-3">Top Authors</h3>
+      <ul>
+        {accounts.map((account) => (
+          <li key={account.id} className="flex items-center gap-4 mb-4">
+            <Link href={`/profile/${account.id}`}>
+              {account.profile_picture ? (
+                <img
+                  src={account.profile_picture}
+                  alt={account.display_name}
+                  className="w-10 h-10 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                  {account.display_name.charAt(0)}
+                </div>
+              )}
+            </Link>
+            <div>
+              <Link href={`/profile/${account.id}`} className="hover:underline">
+                <p className="font-bold">{account.display_name}</p>
+              </Link>
+              <p className="text-sm text-gray-500">{account.email}</p>
+              <p className="text-sm text-gray-500">
+                {account.followers ? account.followers.length : 0} Followers
+              </p>
+            </div>
+          </li>
+        ))}
       </ul>
     </div>
   );
@@ -272,6 +331,8 @@ export default function Home() {
         </div>
         <div className="md:w-1/3 space-y-6">
           <DevPicks />
+          <hr className="border-t border-gray-200" />
+          <SuggestedAccounts />
         </div>
       </div>
     </div>

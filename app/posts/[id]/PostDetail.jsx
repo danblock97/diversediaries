@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import FeedbackModal from "@/components/FeedbackModal";
 import LikeButton from "@/components/LikeButton";
+import Comment from "@/components/Comment";
 
 export default function PostDetail({ id }) {
   const { user } = useAuth();
@@ -127,34 +128,42 @@ export default function PostDetail({ id }) {
 
       let profilesData = {};
       if (userIds.length > 0) {
-        // Fetch profile data for each user (display_name, email, avatar_url)
+        console.log("Fetching profiles for user IDs:", userIds);
+
+        // Fetch profile data for each user
         const { data: profiles, error: profilesError } = await supabase
           .from("profiles")
-          .select("id, display_name, email, avatar_url")
+          .select("*")
           .in("id", userIds);
 
+        console.log(
+          "Profiles fetch result:",
+          profiles,
+          "Error:",
+          profilesError,
+        );
+
         if (!profilesError && profiles) {
+          // Create a lookup object with user_id as key
           profiles.forEach((profile) => {
             profilesData[profile.id] = profile;
           });
         }
       }
 
-      // Attach display name to each comment with a fallback: display_name > email > "Anonymous"
+      // Attach profile data to each comment
       const commentsWithProfiles = commentsData.map((comment) => {
-        const userProfile = profilesData[comment.user_id] || {};
-        const displayName =
-          userProfile.display_name || userProfile.email || "Anonymous";
         return {
           ...comment,
-          profiles: {
-            ...userProfile,
-            display_name: displayName,
-          },
+          profiles: profilesData[comment.user_id] || {},
         };
       });
 
-      // Build up comment reply threads
+      // Add console logs here, inside the function where the variables exist
+      console.log("Comments with profiles:", commentsWithProfiles);
+      console.log("Profile data lookup:", profilesData);
+
+      // Build comment threads
       const threads = {};
       commentsWithProfiles.forEach((comment) => {
         if (comment.parent_comment_id) {
@@ -181,6 +190,7 @@ export default function PostDetail({ id }) {
     }
   };
 
+  // Fix the useEffect - remove the console.log statements here
   useEffect(() => {
     fetchComments();
   }, [id, user]);
@@ -198,25 +208,65 @@ export default function PostDetail({ id }) {
         post_id: id,
         user_id: user.id,
         content: newComment.trim(),
+        parent_comment_id: replyingTo || null, // Track if this is a reply
       };
 
-      if (replyingTo) {
-        commentData.parent_comment_id = replyingTo;
-      }
-
-      const { data, error } = await supabase
+      const { data: insertedComment, error: commentError } = await supabase
         .from("comments")
         .insert([commentData])
-        .select();
+        .select()
+        .single();
 
-      if (error) throw new Error(error.message);
+      if (commentError) {
+        console.error("❌ Error inserting comment:", commentError);
+        throw new Error(commentError.message);
+      }
 
-      // (Optional) Create notification logic can be added here
+      console.log("✅ Comment inserted successfully:", insertedComment);
+
+      // 1️⃣ Notify the post author if someone (not the author) comments on their post
+      if (post?.user_id && post.user_id !== user.id) {
+        const notificationMessage = `Someone commented on your post: "${newComment.trim().slice(0, 250)}..."`;
+
+        await supabase.from("notifications").insert([
+          {
+            recipient_id: post.user_id, // Post owner
+            type: "comment",
+            message: notificationMessage,
+            is_read: false,
+          },
+        ]);
+      }
+
+      // 2️⃣ Notify the original commenter if the post author replies to their comment
+      if (replyingTo) {
+        const { data: parentComment, error: parentError } = await supabase
+          .from("comments")
+          .select("user_id")
+          .eq("id", replyingTo)
+          .single();
+
+        if (!parentError && parentComment?.user_id !== user.id) {
+          const replyMessage = `Someone replied to your comment: "${newComment.trim().slice(0, 250)}..."`;
+
+          await supabase.from("notifications").insert([
+            {
+              recipient_id: parentComment.user_id, // Original commenter
+              type: "reply",
+              message: replyMessage,
+              is_read: false,
+            },
+          ]);
+
+          console.log("✅ Reply notification sent to:", parentComment.user_id);
+        }
+      }
 
       await fetchComments();
       setNewComment("");
       setReplyingTo(null);
     } catch (err) {
+      console.error("❌ Failed to post comment:", err);
       alert("Failed to post comment. Please try again.");
     } finally {
       setCommentLoading(false);
@@ -424,148 +474,26 @@ export default function PostDetail({ id }) {
               const thread = commentThreads[comment.id];
               return (
                 <div key={comment.id} className="comment-thread">
-                  <div className="bg-white rounded-lg shadow-sm p-6 mb-4">
-                    <div className="flex items-start">
-                      <div className="flex-shrink-0 w-10 h-10 bg-gray-300 rounded-full overflow-hidden mr-4">
-                        {comment.profiles?.avatar_url ? (
-                          <img
-                            src={comment.profiles.avatar_url}
-                            alt="Commenter"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="h-full w-full flex items-center justify-center bg-gray-200 text-gray-500">
-                            {comment.profiles?.display_name
-                              ?.charAt(0)
-                              ?.toUpperCase() || "A"}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-center mb-2">
-                          <div>
-                            <p className="font-medium text-gray-900">
-                              {comment.profiles?.display_name || "Anonymous"}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {new Date(comment.created_at).toLocaleDateString(
-                                "en-US",
-                                {
-                                  month: "short",
-                                  day: "numeric",
-                                  year: "numeric",
-                                },
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="prose prose-sm max-w-none">
-                          <p className="text-gray-800 whitespace-pre-line">
-                            {comment.content}
-                          </p>
-                        </div>
-                        <div className="mt-3">
-                          <button
-                            onClick={() => {
-                              setReplyingTo(comment.id);
-                              document.querySelector("textarea").focus();
-                            }}
-                            className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              className="h-4 w-4 mr-1"
-                              fill="none"
-                              viewBox="0 0 24 24"
-                              stroke="currentColor"
-                            >
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={2}
-                                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                              />
-                            </svg>
-                            Reply
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  <Comment
+                    comment={comment}
+                    onReply={() => {
+                      setReplyingTo(comment.id);
+                      document.querySelector("textarea").focus();
+                    }}
+                  />
+
                   {thread?.replies && thread.replies.length > 0 && (
                     <div className="ml-12 mt-2 space-y-4">
                       {thread.replies.map((reply, index) => (
-                        <div
+                        <Comment
                           key={`${reply.id}-${index}`}
-                          className="bg-white rounded-lg border-l-4 border-gray-200 pl-4 p-6 mb-4"
-                        >
-                          <div className="flex items-start">
-                            <div className="flex-shrink-0 w-10 h-10 bg-gray-300 rounded-full overflow-hidden mr-4">
-                              {reply.profiles?.avatar_url ? (
-                                <img
-                                  src={reply.profiles.avatar_url}
-                                  alt="Commenter"
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <div className="h-full w-full flex items-center justify-center bg-gray-200 text-gray-500">
-                                  {reply.profiles?.display_name
-                                    ?.charAt(0)
-                                    ?.toUpperCase() || "A"}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex justify-between items-center mb-2">
-                                <div>
-                                  <p className="font-medium text-gray-900">
-                                    {reply.profiles?.display_name ||
-                                      "Anonymous"}
-                                  </p>
-                                  <p className="text-xs text-gray-500">
-                                    {new Date(
-                                      reply.created_at,
-                                    ).toLocaleDateString("en-US", {
-                                      month: "short",
-                                      day: "numeric",
-                                      year: "numeric",
-                                    })}
-                                  </p>
-                                </div>
-                              </div>
-                              <div className="prose prose-sm max-w-none">
-                                <p className="text-gray-800 whitespace-pre-line">
-                                  {reply.content}
-                                </p>
-                              </div>
-                              <div className="mt-3">
-                                <button
-                                  onClick={() => {
-                                    setReplyingTo(comment.id);
-                                    document.querySelector("textarea").focus();
-                                  }}
-                                  className="text-sm text-blue-600 hover:text-blue-800 font-medium flex items-center"
-                                >
-                                  <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-4 w-4 mr-1"
-                                    fill="none"
-                                    viewBox="0 0 24 24"
-                                    stroke="currentColor"
-                                  >
-                                    <path
-                                      strokeLinecap="round"
-                                      strokeLinejoin="round"
-                                      strokeWidth={2}
-                                      d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
-                                    />
-                                  </svg>
-                                  Reply
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                          comment={reply}
+                          isReply={true}
+                          onReply={() => {
+                            setReplyingTo(comment.id);
+                            document.querySelector("textarea").focus();
+                          }}
+                        />
                       ))}
                     </div>
                   )}

@@ -144,7 +144,6 @@ export default function Header() {
 
     window.ATL_JQ_PAGE_PROPS = {
       triggerFunction: function (showCollectorDialog) {
-        // Bind the Report a Bug button click event so it triggers the Jira dialog.
         jQuery("#myCustomTrigger").click(function (e) {
           e.preventDefault();
           showCollectorDialog();
@@ -278,7 +277,6 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Right side: Write, Report a Bug, Notification, Avatar Dropdown */}
         <div className="flex items-center space-x-6 relative">
           <a
             href="/dashboard/new"
@@ -287,13 +285,12 @@ export default function Header() {
             Write
           </a>
 
-          {/* Report a Bug Button */}
-          <button
+          <a
             id="myCustomTrigger"
-            className="hover:underline text-sm font-medium"
+            className="hover:underline font-medium flex items-center cursor-pointer pt-2"
           >
             Report a Bug
-          </button>
+          </a>
 
           <NotificationsButton userId={user.id} />
 
@@ -352,26 +349,13 @@ export default function Header() {
     <header className="w-full border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between relative">
       <div className="logo text-2xl font-bold">Diverse Diaries</div>
       <nav className="hidden md:flex space-x-4">
-        <a href="#" className="hover:underline">
-          Our Story
-        </a>
-        <a href="#" className="hover:underline">
-          Membership
-        </a>
-        <a href="#" className="hover:underline">
-          Write
-        </a>
-        {/* Report a Bug Button */}
-        <button
-          id="myCustomTrigger"
-          className="hover:underline text-sm font-medium"
-        >
+        <a id="myCustomTrigger" className="hover:underline cursor-pointer pt-2">
           Report a Bug
-        </button>
+        </a>
         <a
           href="#"
           onClick={openModal}
-          className="hover:underline cursor-pointer"
+          className="hover:underline cursor-pointer pt-2"
         >
           Sign in
         </a>
@@ -410,21 +394,20 @@ export default function Header() {
           <a href="#" className="hover:underline">
             Write
           </a>
-          {/* Report a Bug Button */}
-          <button
+          <a
             id="myCustomTrigger"
-            className="hover:underline text-sm font-medium"
+            className="hover:underline text-sm font-medium cursor-pointer pt-2"
             onClick={() => setMobileMenuOpen(false)}
           >
             Report a Bug
-          </button>
+          </a>
           <a
             href="#"
             onClick={() => {
               openModal();
               setMobileMenuOpen(false);
             }}
-            className="hover:underline cursor-pointer"
+            className="hover:underline cursor-pointer pt-2"
           >
             Sign in
           </a>

@@ -30,7 +30,7 @@ export default function DashboardPage() {
   // UI states
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [setUploading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
 
   // For delete confirmation modal

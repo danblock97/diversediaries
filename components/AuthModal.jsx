@@ -47,6 +47,7 @@ export default function AuthModal({ isOpen, onClose }) {
               className="w-full border border-gray-300 p-3 rounded-md text-lg mb-4"
             />
             <button
+              type="button"
               onClick={handleSubmit}
               disabled={loading || sent}
               className="w-full bg-black text-white px-6 py-3 rounded-full disabled:opacity-50"

@@ -111,8 +111,7 @@ export const QuoteIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
     width="20"
-    heig
-    ht="20"
+    height="20"
     fill="none"
     viewBox="0 0 24 24"
     stroke="currentColor"

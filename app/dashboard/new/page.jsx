@@ -152,16 +152,19 @@ export default function NewPostPage() {
               </label>
               <div className="flex flex-wrap gap-2">
                 {categories.map((cat) => (
-                  <label key={cat.id} className="flex items-center space-x-1">
-                    <input
-                      type="checkbox"
-                      value={cat.id}
-                      checked={selectedCategories.includes(cat.id)}
-                      onChange={() => handleCategoryChange(cat.id)}
-                      className="h-4 w-4"
-                    />
-                    <span className="text-sm">{cat.name}</span>
-                  </label>
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => handleCategoryChange(cat.id)}
+                    aria-pressed={selectedCategories.includes(cat.id)}
+                    className={`px-4 py-2 rounded-full border transition-colors ${
+                      selectedCategories.includes(cat.id)
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-gray-800 border-gray-300 hover:bg-gray-100"
+                    }`}
+                  >
+                    {cat.name}
+                  </button>
                 ))}
               </div>
             </div>

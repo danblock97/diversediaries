@@ -53,21 +53,21 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Profile creation logic using auth metadata for display_name and email.
+  // Profile creation logic using auth metadata.
+  // This upsert ensures that a profile exists (or is updated) when the user signs in.
   useEffect(() => {
     const createProfileIfMissing = async () => {
       if (session?.user) {
         try {
           const { user } = session;
-          // Use the full name from user_metadata if available, otherwise fallback to email.
           const display_name = user.user_metadata?.full_name || user.email;
           const { error } = await supabase.from("profiles").upsert({
             id: user.id,
             bio: "",
             profile_picture: "",
             preferences: {},
-            display_name, // New display_name field.
-            email: user.email, // New email field.
+            display_name,
+            email: user.email,
           });
           if (error && error.code !== "23505") {
             console.error("Error creating/upserting profile:", error.message);
@@ -81,7 +81,7 @@ export function AuthProvider({ children }) {
     createProfileIfMissing();
   }, [session]);
 
-  // Sign in function using passwordless magic link.
+  // Sign in function using a passwordless magic link.
   const signIn = async (email) => {
     setLoading(true);
     try {

@@ -24,7 +24,9 @@ export default function Header() {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const toggleDropdown = () => setDropdownOpen(!dropdownOpen);
 
-  // In Header.jsx - updated fetchProfileData function
+  // Fetch the profile to set isAdmin.
+  // Note: The profile is already created (or updated) in AuthContext,
+  // so we simply fetch the profile without attempting to create it here.
   useEffect(() => {
     async function fetchProfileData() {
       if (!user) return;
@@ -32,38 +34,21 @@ export default function Header() {
       try {
         const userId = user.id;
 
-        // Try to get existing profile
+        // Fetch the profile for the current user
         const { data, error } = await supabase
           .from("profiles")
           .select("is_admin")
           .eq("id", userId);
 
-        // No profile exists, create one
-        if (error || data.length === 0) {
-          console.log("No profile found, creating one for new user");
-
-          const { error: insertError } = await supabase
-            .from("profiles")
-            .insert([
-              {
-                id: userId,
-                username: user.email?.split("@")[0] || "user",
-                is_admin: false,
-                created_at: new Date().toISOString(),
-              },
-            ]);
-
-          if (insertError) {
-            console.error("Error creating profile:", insertError);
-          }
-
-          setIsAdmin(false);
+        if (error) {
+          console.error("Error fetching profile:", error);
           return;
         }
 
-        // Profile exists
         if (data && data.length > 0) {
           setIsAdmin(!!data[0].is_admin);
+        } else {
+          setIsAdmin(false);
         }
       } catch (err) {
         console.error("Exception when fetching profile:", err);
@@ -98,15 +83,12 @@ export default function Header() {
         return;
       }
 
-      // Check if we have posts before proceeding
       if (!data || data.length === 0) {
         setSearchResults([]);
         setShowResults(true);
         return;
       }
 
-      // We don't need to fetch profiles separately - we'll handle this in the render
-      // Just set the search results directly
       setSearchResults(data);
       setShowResults(true);
     } catch (err) {
@@ -125,18 +107,6 @@ export default function Header() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  // Show loading state while authentication is being checked
-  if (loading) {
-    return (
-      <header className="w-full border-b border-gray-200 px-8 py-4 flex items-center justify-between relative">
-        <div className="logo text-2xl font-bold">
-          <Link href="/">Diverse Diaries</Link>
-        </div>
-        <div className="animate-pulse bg-gray-200 h-8 w-20 rounded"></div>
-      </header>
-    );
-  }
 
   // Authenticated Header
   if (user) {

@@ -5,7 +5,30 @@ import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata = {
   title: "Diverse Diaries",
-  description: "A place to read, write, and deepen your understanding.",
+  description:
+    "Explore insightful stories and engaging essays at Diverse Diaries, where creative voices share unique experiences and inspire deeper understanding.",
+  openGraph: {
+    title: "Diverse Diaries",
+    description:
+      "Explore insightful stories and engaging essays at Diverse Diaries, where creative voices share unique experiences and inspire deeper understanding.",
+    url: "https://diversediaries.com",
+    type: "website",
+    images: [
+      {
+        url: "https://diversediaries.com/images/hero.png",
+        width: 1200,
+        height: 630,
+        alt: "Descriptive alt text",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Diverse Diaries",
+    description:
+      "Explore insightful stories and engaging essays at Diverse Diaries, where creative voices share unique experiences and inspire deeper understanding.",
+    image: "https://diversediaries.com/images/hero.png",
+  },
 };
 
 export default function RootLayout({ children }) {

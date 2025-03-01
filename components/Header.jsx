@@ -119,6 +119,40 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Load jQuery and the Jira Issue Collector script
+  useEffect(() => {
+    if (typeof window !== "undefined" && !window.jQuery) {
+      const jqueryScript = document.createElement("script");
+      jqueryScript.src =
+        "https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js";
+      jqueryScript.async = true;
+      document.body.appendChild(jqueryScript);
+      jqueryScript.onload = loadJiraCollector;
+    } else {
+      loadJiraCollector();
+    }
+
+    function loadJiraCollector() {
+      // Load the Jira Issue Collector script using jQuery.ajax as required
+      jQuery.ajax({
+        url: "https://danblock97.atlassian.net/s/d41d8cd98f00b204e9800998ecf8427e-T/g2slup/b/9/b0105d975e9e59f24a3230a22972a71a/_/download/batch/com.atlassian.jira.collector.plugin.jira-issue-collector-plugin:issuecollector-embededjs/com.atlassian.jira.collector.plugin.jira-issue-collector-plugin:issuecollector-embededjs.js?locale=en-GB&collectorId=dce956ff",
+        type: "get",
+        cache: true,
+        dataType: "script",
+      });
+    }
+
+    window.ATL_JQ_PAGE_PROPS = {
+      triggerFunction: function (showCollectorDialog) {
+        // Bind the Report a Bug button click event so it triggers the Jira dialog.
+        jQuery("#myCustomTrigger").click(function (e) {
+          e.preventDefault();
+          showCollectorDialog();
+        });
+      },
+    };
+  }, []);
+
   // Authenticated Header
   if (user) {
     return (
@@ -244,7 +278,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Right side: Write, Notification, Avatar Dropdown */}
+        {/* Right side: Write, Report a Bug, Notification, Avatar Dropdown */}
         <div className="flex items-center space-x-6 relative">
           <a
             href="/dashboard/new"
@@ -252,6 +286,14 @@ export default function Header() {
           >
             Write
           </a>
+
+          {/* Report a Bug Button */}
+          <button
+            id="myCustomTrigger"
+            className="hover:underline text-sm font-medium"
+          >
+            Report a Bug
+          </button>
 
           <NotificationsButton userId={user.id} />
 
@@ -319,6 +361,13 @@ export default function Header() {
         <a href="#" className="hover:underline">
           Write
         </a>
+        {/* Report a Bug Button */}
+        <button
+          id="myCustomTrigger"
+          className="hover:underline text-sm font-medium"
+        >
+          Report a Bug
+        </button>
         <a
           href="#"
           onClick={openModal}
@@ -361,6 +410,14 @@ export default function Header() {
           <a href="#" className="hover:underline">
             Write
           </a>
+          {/* Report a Bug Button */}
+          <button
+            id="myCustomTrigger"
+            className="hover:underline text-sm font-medium"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            Report a Bug
+          </button>
           <a
             href="#"
             onClick={() => {

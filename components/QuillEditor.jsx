@@ -28,7 +28,7 @@ const QuillEditor = ({ value, onChange }) => {
       if (file) {
         const fileExt = file.name.split(".").pop();
         const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `quill/${fileName}`;
+        const filePath = `post-images/${fileName}`;
 
         // Upload the file to your "media" bucket in Supabase Storage
         const { error: uploadError } = await supabase.storage

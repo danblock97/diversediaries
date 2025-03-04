@@ -1,36 +1,32 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Diverse Diaries v1.1.0 – A Burst of Exciting New Features!
 
-## Getting Started
+We're thrilled to announce a fresh update to Diverse Diaries, packed with new features and exciting improvements to make your experience even more engaging.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## What's New?
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Sleek and Smart Navigation
+- **Enhanced Navbar:** Enjoy a revamped navigation bar featuring all-new, eye-catching icons for key actions. The "Write" button now sports a unique icon, and our notification bell has been completely reimagined for clarity and style.
+- **Profile Makeover:** We’ve updated the dashboard by renaming “Your Dashboard” to “Profile” for a more personal touch and refined the overall font consistency for a seamless experience.
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+### Homepage Posts – Now Even More Interactive
+- **Visual Boost:** Posts now shine with featured images when available.
+- **Engagement Highlights:** Quickly see the buzz – comments now come with an icon and count next to the likes, while the creation date neatly joins the like section.
+- **Instant Insights:** Hover over an author’s name and get a quick peek at their profile details with an intuitive tooltip display.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### Your Personal Reading Haven
+- **Brand New Reading List:** Create your own reading list effortlessly. Save your favorite stories from the homepage, manage them on dedicated pages, and even remove or delete lists as you wish.
+- **Privacy and Sharing:** Reading lists start private, but you have the option to make them public. Plus, with a handy “Copy URL” feature, sharing your list with fellow diary enthusiasts has never been easier.
 
-## Learn More
+### Embrace the Night – Dark Mode is Here!
+- **Dark Mode Delight:** Customize your reading experience with a new dark mode option available in your profile settings. Toggle it on to enjoy a sleek, eye-friendly interface every time you log in.
 
-To learn more about Next.js, take a look at the following resources:
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Community-Driven Security
+We received a thoughtful security disclosure from a community member, highlighting potential vulnerabilities. We appreciate the vigilance and commitment to keeping Diverse Diaries a safe and secure space for everyone.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Update now to explore these new features and enhancements. We're excited for you to dive into a more dynamic, interactive, and visually stunning Diverse Diaries experience!

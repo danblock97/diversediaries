@@ -9,7 +9,11 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabaseClient";
 import PostLikes from "@/components/PostLikes";
 import LoadingAnimation from "@/components/LoadingAnimation";
+import AddToReadingListButton from "@/components/AddToReadingListButton"; // Imported here
 
+// -------------------------
+// CategoriesNav Component
+// -------------------------
 function CategoriesNav({ selectedCategory, onSelect }) {
   const [categories, setCategories] = useState([]);
 
@@ -29,9 +33,7 @@ function CategoriesNav({ selectedCategory, onSelect }) {
     <nav className="overflow-x-auto whitespace-nowrap flex items-center space-x-4 text-sm text-gray-600 mb-8 px-2">
       <button
         onClick={() => onSelect(null)}
-        className={`hover:underline flex-shrink-0 ${
-          selectedCategory === null ? "font-bold" : ""
-        }`}
+        className={`hover:underline flex-shrink-0 ${selectedCategory === null ? "font-bold" : ""}`}
       >
         All
       </button>
@@ -39,9 +41,7 @@ function CategoriesNav({ selectedCategory, onSelect }) {
         <button
           key={cat.id}
           onClick={() => onSelect(cat.id)}
-          className={`hover:underline flex-shrink-0 ${
-            selectedCategory === cat.id ? "font-bold" : ""
-          }`}
+          className={`hover:underline flex-shrink-0 ${selectedCategory === cat.id ? "font-bold" : ""}`}
         >
           {cat.name}
         </button>
@@ -50,24 +50,23 @@ function CategoriesNav({ selectedCategory, onSelect }) {
   );
 }
 
+// -------------------------
+// Helper Functions
+// -------------------------
 async function mergeProfilesWithPosts(postsData) {
   const userIds = [...new Set(postsData.map((post) => post.user_id))];
-
   const { data: profilesData, error: profilesError } = await supabase
     .from("profiles")
     .select("id, display_name, bio, profile_picture, followers")
     .in("id", userIds);
-
   if (profilesError) {
     console.error("Error fetching profiles:", profilesError.message);
     return postsData.map((post) => ({ ...post, profile: null }));
   }
-
   const profilesById = {};
   profilesData.forEach((profile) => {
     profilesById[profile.id] = profile;
   });
-
   return postsData.map((post) => ({
     ...post,
     profile: profilesById[post.user_id] || null,
@@ -101,16 +100,23 @@ function extractFirstImage(content) {
 
 function contentPreview(htmlContent, maxLength = 400) {
   if (!htmlContent) return "";
-  // Strip HTML tags
   const text = htmlContent.replace(/<[^>]+>/g, "");
-  // Then limit to maxLength
   let preview = text.trim().slice(0, maxLength);
-  if (text.length > maxLength) {
-    preview += "...";
-  }
+  if (text.length > maxLength) preview += "...";
   return preview;
 }
 
+function calculateReadTime(content) {
+  if (!content) return 0;
+  const text = content.replace(/<[^>]+>/g, "");
+  const wordsPerMinute = 200;
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  return Math.ceil(wordCount / wordsPerMinute);
+}
+
+// -------------------------
+// AuthorTooltip Component (as before)
+// -------------------------
 function AuthorTooltip({ profile }) {
   const router = useRouter();
   const { user } = useAuth();
@@ -130,19 +136,15 @@ function AuthorTooltip({ profile }) {
   };
 
   const handleMouseLeave = () => {
-    hideTimeoutRef.current = setTimeout(() => {
-      setShow(false);
-    }, 200);
+    hideTimeoutRef.current = setTimeout(() => setShow(false), 200);
   };
 
-  // Navigate to profile
   const handleProfileClick = (e) => {
     e.preventDefault();
     e.stopPropagation();
     router.push(`/profile/${profile?.id}`);
   };
 
-  // Follow/unfollow logic using the JSONB followers field.
   const handleFollow = async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -160,11 +162,8 @@ function AuthorTooltip({ profile }) {
       .from("profiles")
       .update({ followers: updatedFollowers })
       .eq("id", profile.id);
-    if (!error) {
-      setIsFollowing(!isFollowing);
-    } else {
-      console.error("Error updating followers:", error.message);
-    }
+    if (!error) setIsFollowing(!isFollowing);
+    else console.error("Error updating followers:", error.message);
   };
 
   return (
@@ -219,18 +218,7 @@ function AuthorTooltip({ profile }) {
 }
 
 // -------------------------
-// Helper: Calculate read time
-// -------------------------
-function calculateReadTime(content) {
-  if (!content) return 0;
-  const text = content.replace(/<[^>]+>/g, "");
-  const wordsPerMinute = 200;
-  const wordCount = text.split(/\s+/).filter(Boolean).length;
-  return Math.ceil(wordCount / wordsPerMinute);
-}
-
-// -------------------------
-// PostsFeed Component (Grid Layout + content preview)
+// PostsFeed Component with Adjusted Reading List Button Placement
 // -------------------------
 function PostsFeed({ selectedCategory }) {
   const [posts, setPosts] = useState([]);
@@ -303,26 +291,20 @@ function PostsFeed({ selectedCategory }) {
     <div>
       {posts.map((post) => {
         const imageUrl = extractFirstImage(post.content);
-        const previewText = contentPreview(post.content, 400); // 400 chars, adjust as needed
-
+        const previewText = contentPreview(post.content, 400);
         return (
           <Link key={post.id} href={`/posts/${post.id}`} className="block">
             <div className="flex flex-col border-b border-gray-200 pb-6 hover:bg-gray-50 transition px-2">
-              {/* Author & read time */}
-              <div className="text-sm text-gray-500 mb-2">
-                <AuthorTooltip profile={post.profile} /> ·{" "}
-                {calculateReadTime(post.content)} min read
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-gray-500 mb-2">
+                  <AuthorTooltip profile={post.profile} /> ·{" "}
+                  {calculateReadTime(post.content)} min read
+                </div>
               </div>
-
-              {/* Use a grid to keep text on the left and a bigger image on the right */}
               <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-start mb-2">
-                {/* Left column: title, preview text, date, etc. */}
                 <div>
                   <h2 className="text-xl font-semibold">{post.title}</h2>
-                  <p className="text-gray-700 mb-2">
-                    {/* Show partial content to fill space */}
-                    {previewText}
-                  </p>
+                  <p className="text-gray-700 mb-2">{previewText}</p>
                   <div className="flex items-center text-sm text-gray-500 pb-2 space-x-4">
                     <span>
                       {new Date(post.created_at).toLocaleDateString()}
@@ -332,10 +314,9 @@ function PostsFeed({ selectedCategory }) {
                       <span>{post.comment_count}</span>
                     </div>
                     <PostLikes postId={post.id} />
+                    <AddToReadingListButton postId={post.id} />
                   </div>
                 </div>
-
-                {/* Right column: bigger image */}
                 {imageUrl && (
                   <div className="relative w-48 h-48">
                     <Image
@@ -351,27 +332,14 @@ function PostsFeed({ selectedCategory }) {
           </Link>
         );
       })}
-
-      {!hasMore && posts.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-8">
-          <Image
-            src="/images/nodata.png"
-            alt="No Data"
-            className="w-48 h-auto mb-4"
-            width={200}
-            height={200}
-          />
-          <p className="text-lg text-gray-500">No posts found.</p>
-        </div>
-      )}
-
+      {/* Sentinel for infinite scroll */}
       <div ref={sentinelRef} />
     </div>
   );
 }
 
 // -------------------------
-// DevPicks Component
+// DevPicks Component (unchanged)
 // -------------------------
 function DevPicks() {
   const [devPosts, setDevPosts] = useState([]);
@@ -432,7 +400,7 @@ function DevPicks() {
 }
 
 // -------------------------
-// SuggestedAccounts Component
+// SuggestedAccounts Component (unchanged)
 // -------------------------
 function SuggestedAccounts() {
   const { user } = useAuth();

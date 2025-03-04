@@ -1,4 +1,3 @@
-// PublicProfile.jsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -10,10 +9,11 @@ export default function PublicProfile({ profileId }) {
   const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
+  const [readingLists, setReadingLists] = useState([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Fetch the profile info including the new "followers" column.
+  // Fetch profile info
   useEffect(() => {
     async function fetchProfile() {
       const { data, error } = await supabase
@@ -23,7 +23,6 @@ export default function PublicProfile({ profileId }) {
         .single();
       if (!error) {
         setProfile(data);
-        // Check if the current user (if logged in) is following this profile.
         if (user && data.followers && data.followers.includes(user.id)) {
           setIsFollowing(true);
         }
@@ -47,6 +46,22 @@ export default function PublicProfile({ profileId }) {
     fetchPosts();
   }, [profileId]);
 
+  // Fetch public reading lists for the profile.
+  useEffect(() => {
+    async function fetchReadingLists() {
+      const { data, error } = await supabase
+        .from("reading_lists")
+        .select("id, title, description, is_public, created_at")
+        .eq("user_id", profileId)
+        .eq("is_public", true)
+        .order("created_at", { ascending: false });
+      if (!error) {
+        setReadingLists(data);
+      }
+    }
+    fetchReadingLists();
+  }, [profileId]);
+
   // Toggle follow/unfollow.
   const handleFollow = async () => {
     if (!user) {
@@ -55,10 +70,8 @@ export default function PublicProfile({ profileId }) {
     }
     let updatedFollowers;
     if (isFollowing) {
-      // Remove the current user's id
       updatedFollowers = profile.followers.filter((f) => f !== user.id);
     } else {
-      // Add the current user's id
       updatedFollowers = [...(profile.followers || []), user.id];
     }
     const { error } = await supabase
@@ -77,7 +90,7 @@ export default function PublicProfile({ profileId }) {
   if (!profile) return <p>Profile not found.</p>;
 
   return (
-    <div className="max-w-5xl mx-auto py-12 h-screen">
+    <div className="max-w-5xl mx-auto py-12">
       <div className="flex items-center space-x-4 mb-8">
         {profile.profile_picture ? (
           <img
@@ -106,7 +119,8 @@ export default function PublicProfile({ profileId }) {
           </button>
         )}
       </div>
-      <div>
+
+      <div className="mb-12">
         <h2 className="text-xl font-semibold mb-4">Posts</h2>
         {posts.length > 0 ? (
           posts.map((post) => (
@@ -123,6 +137,26 @@ export default function PublicProfile({ profileId }) {
           ))
         ) : (
           <p>No posts yet.</p>
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-xl font-semibold mb-4">Public Reading Lists</h2>
+        {readingLists.length > 0 ? (
+          readingLists.map((list) => (
+            <div key={list.id} className="border p-4 rounded mb-4">
+              <Link href={`/reading-lists/${list.id}`}>
+                <h3 className="text-lg font-bold hover:underline">
+                  {list.title}
+                </h3>
+              </Link>
+              {list.description && (
+                <p className="text-sm text-gray-600 mt-1">{list.description}</p>
+              )}
+            </div>
+          ))
+        ) : (
+          <p>No public reading lists available.</p>
         )}
       </div>
     </div>

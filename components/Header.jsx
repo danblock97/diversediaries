@@ -327,6 +327,16 @@ export default function Header() {
                     </div>
                   </Link>
                 )}
+                {/* New section split by a grey line */}
+                <hr className="my-1 border-gray-200" />
+                <Link href="/reading-lists">
+                  <div
+                    onClick={() => setDropdownOpen(false)}
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  >
+                    My Lists
+                  </div>
+                </Link>
                 <button
                   onClick={async () => {
                     await signOut();

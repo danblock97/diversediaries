@@ -277,12 +277,27 @@ export default function Header() {
         </div>
 
         <div className="flex items-center space-x-6 relative">
-          <a
+          {/* Write Link with Pencil Icon */}
+          <Link
             href="/dashboard/new"
-            className="hover:underline text-md font-medium"
+            className="flex items-center hover:underline text-md font-medium"
           >
+            <svg
+              className="w-5 h-5 mr-1"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 20h9" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"
+              />
+            </svg>
             Write
-          </a>
+          </Link>
 
           {/* Authenticated Report a Bug */}
           <a
@@ -293,7 +308,13 @@ export default function Header() {
             Report a Bug
           </a>
 
-          <NotificationsButton userId={user.id} />
+          {/* Notifications Button with improved styling */}
+          <div className="relative">
+            <NotificationsButton
+              userId={user.id}
+              className="w-6 h-6 text-gray-700"
+            />
+          </div>
 
           {/* Avatar Dropdown */}
           <div className="relative">
@@ -312,28 +333,74 @@ export default function Header() {
                 <Link href="/dashboard">
                   <div
                     onClick={() => setDropdownOpen(false)}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="flex items-center gap-2 block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
-                    Your Dashboard
+                    {/* User Icon */}
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5.121 17.804A12 12 0 1118.878 6.196 12 12 0 015.121 17.804z"
+                      />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                      />
+                    </svg>
+                    Profile
                   </div>
                 </Link>
                 {isAdmin && (
                   <Link href="/admin">
                     <div
                       onClick={() => setDropdownOpen(false)}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      className="flex items-center gap-2 block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
+                      {/* Shield Icon for Admin */}
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"
+                        />
+                      </svg>
                       Admin Dashboard
                     </div>
                   </Link>
                 )}
-                {/* New section split by a grey line */}
                 <hr className="my-1 border-gray-200" />
                 <Link href="/reading-lists">
                   <div
                     onClick={() => setDropdownOpen(false)}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="flex items-center gap-2 block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
+                    {/* List Icon */}
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4 6h16M4 12h16M4 18h16"
+                      />
+                    </svg>
                     My Lists
                   </div>
                 </Link>
@@ -343,8 +410,22 @@ export default function Header() {
                     setDropdownOpen(false);
                     router.push("/");
                   }}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                  className="flex items-center gap-2 block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
+                  {/* Logout Icon */}
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M17 16l4-4m0 0l-4-4m4 4H7"
+                    />
+                  </svg>
                   Sign out
                 </button>
               </div>
@@ -359,8 +440,7 @@ export default function Header() {
   return (
     <header className="w-full border-b border-gray-200 px-4 md:px-8 py-4 flex items-center justify-between relative">
       <div className="logo text-2xl font-bold">Diverse Diaries</div>
-      <nav className="hidden md:flex space-x-4">
-        {/* Non-authenticated Report a Bug - add pt-2 */}
+      <nav className="hidden md:flex space-x-4 items-center">
         <a
           id="myCustomTrigger"
           className="hover:underline text-md font-medium cursor-pointer pt-2"
@@ -376,7 +456,7 @@ export default function Header() {
         </a>
         <button
           onClick={openModal}
-          className="bg-black text-white px-4 py-2 rounded-full ml-2"
+          className="bg-black text-white px-4 py-2 rounded-full ml-2 text-md font-medium"
         >
           Get started
         </button>
@@ -401,18 +481,36 @@ export default function Header() {
 
       {mobileMenuOpen && (
         <div className="absolute top-full left-0 w-full bg-white border-t border-gray-200 p-4 flex flex-col space-y-2 md:hidden">
-          <a href="#" className="hover:underline">
+          <a href="#" className="hover:underline text-md font-medium">
             Our Story
           </a>
-          <a href="#" className="hover:underline">
+          <a href="#" className="hover:underline text-md font-medium">
             Membership
           </a>
-          <a href="#" className="hover:underline">
+          {/* Write link with Pencil Icon */}
+          <a
+            href="#"
+            className="flex items-center hover:underline text-md font-medium"
+          >
+            <svg
+              className="w-5 h-5 mr-1"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 20h9" />
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"
+              />
+            </svg>
             Write
           </a>
           <a
             id="myCustomTrigger"
-            className="hover:underline text-sm font-medium cursor-pointer pt-2"
+            className="hover:underline text-md font-medium cursor-pointer pt-2"
             onClick={() => setMobileMenuOpen(false)}
           >
             Report a Bug
@@ -423,7 +521,7 @@ export default function Header() {
               openModal();
               setMobileMenuOpen(false);
             }}
-            className="hover:underline text-sm font-medium cursor-pointer pt-2"
+            className="hover:underline text-md font-medium cursor-pointer pt-2"
           >
             Sign in
           </a>
@@ -432,7 +530,7 @@ export default function Header() {
               openModal();
               setMobileMenuOpen(false);
             }}
-            className="bg-black text-white px-4 py-2 rounded-full"
+            className="bg-black text-white px-4 py-2 rounded-full text-md font-medium"
           >
             Get started
           </button>

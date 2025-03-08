@@ -4,10 +4,8 @@ import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/lib/supabaseClient";
 import LoadingAnimation from "@/components/LoadingAnimation";
 
-// Dynamically import QuillEditor to avoid SSR issues
 const QuillEditor = dynamic(() => import("@/components/QuillEditor"), {
   ssr: false,
   loading: () => <p>Loading Editor...</p>,
@@ -25,20 +23,23 @@ export default function NewPostPage() {
   const [loadingPost, setLoadingPost] = useState(false);
   const [error, setError] = useState("");
 
-  // Always fetch categories regardless.
   useEffect(() => {
     const fetchCategories = async () => {
-      const { data, error } = await supabase.from("categories").select("*");
-      if (error) {
-        console.error("Error fetching categories:", error.message);
-      } else {
-        setCategories(data);
+      try {
+        const res = await fetch("/api/categories");
+        const data = await res.json();
+        if (res.ok) {
+          setCategories(data);
+        } else {
+          console.error("Error fetching categories:", data.error);
+        }
+      } catch (err) {
+        console.error("Error fetching categories:", err.message);
       }
     };
     fetchCategories();
   }, []);
 
-  // Redirect if not authenticated (but only do this after loading is finished).
   useEffect(() => {
     if (!loading && !user) {
       router.push("/");
@@ -70,35 +71,27 @@ export default function NewPostPage() {
 
     setLoadingPost(true);
 
-    // Insert new post into the posts table.
-    const { data: postData, error: postError } = await supabase
-      .from("posts")
-      .insert([{ title, content, user_id: user.id }])
-      .select();
-
-    if (postError || !postData || postData.length === 0) {
-      setError(postError?.message || "Failed to create post");
+    const res = await fetch("/api/posts", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        title,
+        content,
+        user_id: user.id,
+        selectedCategories,
+      }),
+    });
+    const result = await res.json();
+    if (!res.ok) {
+      setError(result.error || "Failed to create post");
       setLoadingPost(false);
       return;
     }
 
-    const newPost = postData[0];
+    const newPost = result;
 
-    // Insert into the post_categories table.
-    const insertPromises = selectedCategories.map((categoryId) =>
-      supabase
-        .from("post_categories")
-        .insert([{ post_id: newPost.id, category_id: categoryId }]),
-    );
-    const results = await Promise.all(insertPromises);
-    const anyError = results.find((res) => res.error);
-    if (anyError) {
-      setError(anyError.error.message);
-      setLoadingPost(false);
-      return;
-    }
-
-    // Determine if "Other" category is selected.
     const otherCategory = categories.find(
       (cat) => cat.name.toLowerCase() === "other",
     );

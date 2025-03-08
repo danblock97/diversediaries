@@ -15,25 +15,18 @@ export default function AuthModal({ isOpen, onClose }) {
   const handleSubmit = async () => {
     if (!email) return;
     setLoading(true);
-
-    // Check if a profile with this email is banned.
-    const { data: profileData, error: profileError } = await supabase
-      .from("profiles")
-      .select("is_banned")
-      .eq("email", email)
-      .single();
-
-    if (profileData && profileData.is_banned) {
-      setBanned(true);
-      setLoading(false);
-      return;
-    }
-
-    // If not banned, send the magic link.
-    const { error } = await signIn(email);
+    const res = await fetch("/api/auth/signin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    const result = await res.json();
     setLoading(false);
-    if (!error) {
+    if (res.ok) {
       setSent(true);
+    } else {
+      // Handle error, e.g. display error message to the user.
+      console.error(result.error);
     }
   };
 

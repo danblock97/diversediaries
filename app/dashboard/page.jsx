@@ -1,244 +1,190 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { FaCommentAlt } from "react-icons/fa";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/lib/supabaseClient";
 import PostLikes from "@/components/PostLikes";
+import LoadingAnimation from "@/components/LoadingAnimation";
+import AddToReadingListButton from "@/components/AddToReadingListButton";
 
-// Utility: Calculate read time in minutes from post content.
+// Helper: Extract first image URL from HTML content.
+function extractFirstImage(content) {
+  if (!content) return null;
+  const div = document.createElement("div");
+  div.innerHTML = content;
+  const img = div.querySelector("img");
+  return img ? img.getAttribute("src") : null;
+}
+
+// Helper: Generate a text preview from HTML content.
+function contentPreview(htmlContent, maxLength = 400) {
+  if (!htmlContent) return "";
+  const text = htmlContent.replace(/<[^>]+>/g, "");
+  let preview = text.trim().slice(0, maxLength);
+  if (text.length > maxLength) preview += "...";
+  return preview;
+}
+
+// Helper: Calculate read time from content.
 function calculateReadTime(content) {
   if (!content) return 0;
+  const text = content.replace(/<[^>]+>/g, "");
   const wordsPerMinute = 200;
-  const wordCount = content.split(/\s+/).filter(Boolean).length;
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
   return Math.ceil(wordCount / wordsPerMinute);
 }
 
 export default function DashboardPage() {
   const { user } = useAuth();
 
-  // Profile state
+  // Profile state.
   const [profile, setProfile] = useState({
     display_name: "",
     email: "",
     bio: "",
     profile_picture: "",
-    followers: [], // default to an empty array
+    followers: [],
   });
-  // Posts state
-  const [posts, setPosts] = useState([]);
 
-  // UI states
+  // Posts state.
+  const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState("");
-
-  // For delete confirmation modal
   const [postToDelete, setPostToDelete] = useState(null);
 
-  // Fetch user profile including follower count
+  // ───────────────────────────────────────────────
+  // 1) Fetch user profile via API route.
+  // ───────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     async function fetchProfile() {
       setLoading(true);
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("display_name, email, bio, profile_picture, followers")
-        .eq("id", user.id)
-        .single();
-      if (error) {
-        console.error("Error fetching profile:", error.message);
-      } else {
-        setProfile(data);
+      try {
+        const res = await fetch(`/api/profile/${user.id}`);
+        const data = await res.json();
+        if (!res.ok) {
+          console.error("Error fetching profile:", data.error);
+        } else {
+          setProfile(data);
+        }
+      } catch (err) {
+        console.error("Error fetching profile:", err.message);
       }
       setLoading(false);
     }
     fetchProfile();
   }, [user]);
 
-  // Fetch user's posts
+  // ───────────────────────────────────────────────
+  // 2) Fetch ALL posts for the user (no limit).
+  // ───────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     async function fetchPosts() {
-      const { data, error } = await supabase
-        .from("posts")
-        .select("id, title, user_id, content, created_at")
-        .eq("user_id", user.id);
-      if (error) {
-        console.error("Error fetching posts:", error.message);
-      } else {
-        setPosts(data || []);
+      try {
+        // Here we pass a very high limit to load all posts.
+        const res = await fetch(
+          `/api/posts?userId=${user.id}&limit=1000000&offset=0`,
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          console.error("Error fetching posts:", data.error);
+        } else {
+          setPosts(data);
+        }
+      } catch (err) {
+        console.error("Error fetching posts:", err.message);
       }
     }
     fetchPosts();
   }, [user]);
 
-  // Handle form input changes
+  // ───────────────────────────────────────────────
+  // 3) Profile update handler.
+  // ───────────────────────────────────────────────
   const handleChange = (e) => {
     const { name, value } = e.target;
     setProfile((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Handle profile picture upload
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setUploading(true);
-
-    const filePath = `profile-pictures/${user.id}/${file.name}`;
-    const { error: uploadError } = await supabase.storage
-      .from("media")
-      .upload(filePath, file, {
-        cacheControl: "3600",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("Error uploading image:", uploadError.message);
-      setMessage("Error uploading image: " + uploadError.message);
-      setUploading(false);
-      return;
-    }
-
-    // Get the public URL
-    const { data: urlData } = supabase.storage
-      .from("media")
-      .getPublicUrl(filePath);
-    if (!urlData) {
-      console.error("Error getting public URL");
-      setMessage("Error getting image URL");
-      setUploading(false);
-      return;
-    }
-
-    const publicURL = urlData.publicUrl;
-
-    // Update profile picture
-    setProfile((prev) => ({ ...prev, profile_picture: publicURL }));
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({ profile_picture: publicURL })
-      .eq("id", user.id);
-
-    if (updateError) {
-      console.error("Error updating profile picture:", updateError.message);
-      setMessage("Error updating profile picture: " + updateError.message);
-    } else {
-      setMessage("Profile picture updated successfully!");
-    }
-    setUploading(false);
-  };
-
-  // Handle profile form submission
   const handleSubmit = async (e) => {
     e.preventDefault();
     setUpdating(true);
-
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        display_name: profile.display_name,
-        bio: profile.bio,
-      })
-      .eq("id", user.id);
-
-    if (error) {
-      setMessage("Error updating profile: " + error.message);
-    } else {
-      setMessage("Profile updated successfully!");
+    try {
+      const res = await fetch(`/api/profile/${user.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          display_name: profile.display_name,
+          bio: profile.bio,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setMessage("Error updating profile: " + result.error);
+      } else {
+        setMessage("Profile updated successfully!");
+      }
+    } catch (err) {
+      setMessage("Error updating profile: " + err.message);
     }
     setUpdating(false);
   };
 
-  // Open the confirmation modal for a specific post
-  const openDeleteModal = (postId) => {
-    setPostToDelete(postId);
-  };
-
-  // Close the confirmation modal
-  const closeDeleteModal = () => {
-    setPostToDelete(null);
-  };
-
-  // Confirm deletion (called from modal)
+  // ───────────────────────────────────────────────
+  // 4) Delete post handlers.
+  // ───────────────────────────────────────────────
+  const openDeleteModal = (postId) => setPostToDelete(postId);
+  const closeDeleteModal = () => setPostToDelete(null);
   const confirmDeletePost = async () => {
     if (!postToDelete) return;
-
-    const { error } = await supabase
-      .from("posts")
-      .delete()
-      .eq("id", postToDelete);
-
-    if (error) {
-      console.error("Error deleting post:", error.message);
-      setMessage("Error deleting post: " + error.message);
+    try {
+      const res = await fetch(`/api/posts/${postToDelete}`, {
+        method: "DELETE",
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        setMessage("Error deleting post: " + result.error);
+        closeDeleteModal();
+        return;
+      }
+      setPosts((prevPosts) => prevPosts.filter((p) => p.id !== postToDelete));
       closeDeleteModal();
-      return;
+    } catch (err) {
+      setMessage("Error deleting post: " + err.message);
+      closeDeleteModal();
     }
-
-    // Remove the deleted post from local state
-    setPosts((prevPosts) =>
-      prevPosts.filter((post) => post.id !== postToDelete),
-    );
-    closeDeleteModal();
   };
 
-  if (loading) {
-    return <div>Loading profile...</div>;
-  }
+  if (loading) return <LoadingAnimation />;
 
   return (
-    <div className="max-w-5xl mx-auto py-12 h-screen">
-      <div className="flex gap-8">
+    <div className="min-h-screen max-w-7xl mx-auto px-4 py-12">
+      <div className="flex flex-col md:flex-row gap-8">
         {/* Left Column: Profile Settings */}
-        <div className="w-1/3 space-y-4">
+        <div className="md:w-1/3 space-y-4">
           <form onSubmit={handleSubmit}>
-            {/* Profile Picture & Follower Count */}
-            <div className="relative group flex flex-col items-center mb-4">
+            <div className="relative flex flex-col items-center mb-4">
               {profile.profile_picture ? (
-                <img
+                <Image
                   src={profile.profile_picture}
                   alt="Profile Picture"
-                  className="w-24 h-24 rounded-full object-cover mb-2"
+                  width={96}
+                  height={96}
+                  className="rounded-full object-cover"
                 />
               ) : (
-                <div className="w-24 h-24 rounded-full bg-gray-200 mb-2 flex items-center justify-center">
+                <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
                   No Image
                 </div>
               )}
-              {/* Follower Count */}
               <p className="text-sm text-gray-600">
                 {profile.followers ? profile.followers.length : 0} Followers
               </p>
-              <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <label className="cursor-pointer">
-                  <div className="bg-gray-700 bg-opacity-75 p-2 rounded-full">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                      className="w-6 h-6 text-white"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M16.862 3.487a2.14 2.14 0 112.993 2.993l-9.193 9.193a4.286 4.286 0 01-1.845 1.116l-3.614.904a.75.75 0 01-.904-.904l.904-3.614a4.286 4.286 0 011.116-1.845l9.193-9.193z"
-                      />
-                    </svg>
-                  </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
-              </div>
             </div>
-
-            {/* Display Name */}
             <div>
               <label
                 htmlFor="display_name"
@@ -255,8 +201,6 @@ export default function DashboardPage() {
                 className="w-full border border-gray-300 rounded px-3 py-2"
               />
             </div>
-
-            {/* Email (read-only) */}
             <div>
               <label htmlFor="email" className="block mb-1 font-semibold">
                 Email
@@ -267,11 +211,9 @@ export default function DashboardPage() {
                 name="email"
                 value={profile.email}
                 readOnly
-                className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100 cursor-not-allowed"
+                className="w-full border border-gray-300 rounded px-3 py-2 bg-gray-100"
               />
             </div>
-
-            {/* Bio */}
             <div>
               <label htmlFor="bio" className="block mb-1 font-semibold">
                 Bio
@@ -281,11 +223,10 @@ export default function DashboardPage() {
                 name="bio"
                 value={profile.bio}
                 onChange={handleChange}
-                className="w-full border border-gray-300 rounded px-3 py-2"
                 rows="4"
+                className="w-full border border-gray-300 rounded px-3 py-2"
               ></textarea>
             </div>
-
             <button
               type="submit"
               disabled={updating}
@@ -297,53 +238,67 @@ export default function DashboardPage() {
           </form>
         </div>
 
-        {/* Right Column: User Posts */}
-        <div className="w-2/3">
+        {/* Right Column: User Posts with Homepage Layout */}
+        <div className="md:w-2/3">
           {posts.length > 0 ? (
             <div className="space-y-8">
               {posts.map((post) => {
-                const readTime = calculateReadTime(post.content);
+                const imageUrl = extractFirstImage(post.content);
+                const previewText = contentPreview(post.content, 400);
                 return (
-                  <div
+                  <Link
                     key={post.id}
-                    className="border-b border-gray-200 pb-6 hover:bg-gray-50 transition"
+                    href={`/posts/${post.id}`}
+                    className="block"
                   >
-                    {/* 1st line: Display name and read time */}
-                    <p className="text-sm text-gray-500">
-                      {profile.display_name || "Anonymous"} • {readTime} min
-                      read
-                    </p>
-
-                    {/* 2nd line: Post title */}
-                    <h3 className="text-xl font-semibold mt-1 mb-2">
-                      {post.title}
-                    </h3>
-
-                    {/* 3rd line: Published date */}
-                    <p className="text-sm text-gray-500 mb-2">
-                      {new Date(post.created_at).toLocaleDateString()}
-                    </p>
-
-                    {/* 4th line: Likes + Delete */}
-                    <div className="flex items-center gap-4">
-                      <PostLikes postId={post.id} />
-                      <button
-                        onClick={() => openDeleteModal(post.id)}
-                        className="text-sm text-red-600 hover:underline"
-                      >
-                        Delete
-                      </button>
+                    <div className="flex flex-col border-b border-gray-200 pb-6 hover:bg-gray-50 transition px-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm text-gray-500 mb-2">
+                          {profile.display_name} ·{" "}
+                          {calculateReadTime(post.content)} min read
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-4 items-start mb-2">
+                        <div>
+                          <h2 className="text-xl font-semibold">
+                            {post.title}
+                          </h2>
+                          <p className="text-gray-700 mb-2">{previewText}</p>
+                          <div className="flex items-center text-sm text-gray-500 pb-2 space-x-4">
+                            <span>
+                              {new Date(post.created_at).toLocaleDateString()}
+                            </span>
+                            <div className="flex items-center space-x-1">
+                              <FaCommentAlt />
+                              <span>0</span>
+                            </div>
+                            <PostLikes postId={post.id} />
+                            <AddToReadingListButton postId={post.id} />
+                          </div>
+                        </div>
+                        {imageUrl && (
+                          <div className="relative w-48 h-48">
+                            <Image
+                              src={imageUrl}
+                              alt="Post Image"
+                              fill
+                              className="object-cover rounded"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-8">
-              <img
+              <Image
                 src="/images/nodata.png"
                 alt="No Data"
-                className="w-48 h-auto mb-4"
+                width={192}
+                height={192}
               />
               <p className="text-lg text-gray-500">No posts found.</p>
             </div>
@@ -351,14 +306,16 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       {postToDelete && (
         <div className="fixed inset-0 flex items-center justify-center z-50 backdrop-blur-md">
           <div className="bg-white p-6 rounded shadow-lg max-w-md w-full">
-            <img
+            <Image
               src="/images/hero.png"
               alt="Confirm Deletion"
-              className="w-full h-auto mb-4 rounded"
+              width={400}
+              height={300}
+              className="rounded mb-4"
             />
             <h2 className="text-xl font-semibold mb-2">Confirm Deletion</h2>
             <p className="mb-6">

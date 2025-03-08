@@ -4,12 +4,12 @@ import { useEffect, useState, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import { FaCommentAlt } from "react-icons/fa";
 import PostLikes from "@/components/PostLikes";
 import LoadingAnimation from "@/components/LoadingAnimation";
 
+// Helper functions (extracted from your previous code)
 function extractFirstImage(htmlContent) {
   if (!htmlContent) return null;
   const div = document.createElement("div");
@@ -34,56 +34,18 @@ function calculateReadTime(content) {
   return Math.ceil(wordCount / wordsPerMinute);
 }
 
-async function fetchCommentCounts(postIds) {
-  const counts = {};
-  for (const id of postIds) {
-    const { count, error } = await supabase
-      .from("comments")
-      .select("*", { count: "exact", head: true })
-      .eq("post_id", id);
-    if (error) {
-      console.error("Error fetching comment count for post", id, error.message);
-      counts[id] = 0;
-    } else {
-      counts[id] = count || 0;
-    }
-  }
-  return counts;
-}
-
-async function mergeProfilesWithPosts(postsData) {
-  const userIds = [...new Set(postsData.map((post) => post.user_id))];
-  const { data: profilesData, error: profilesError } = await supabase
-    .from("profiles")
-    .select("id, display_name, bio, profile_picture, followers")
-    .in("id", userIds);
-  if (profilesError) {
-    console.error("Error fetching profiles:", profilesError.message);
-    return postsData.map((post) => ({ ...post, profile: null }));
-  }
-  const profilesById = {};
-  profilesData.forEach((profile) => {
-    profilesById[profile.id] = profile;
-  });
-  return postsData.map((post) => ({
-    ...post,
-    profile: profilesById[post.user_id] || null,
-  }));
-}
-
 export default function ReadingListDetailPage() {
+  const { id: listId } = useParams();
   const { user } = useAuth();
-  const params = useParams();
-  const listId = params.id;
   const [readingList, setReadingList] = useState(null);
   const [ownerProfile, setOwnerProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [copySuccess, setCopySuccess] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
-
   const dropdownRef = useRef(null);
 
+  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -97,81 +59,64 @@ export default function ReadingListDetailPage() {
   useEffect(() => {
     async function fetchReadingListData() {
       setLoading(true);
-      // 1. Fetch reading list info using maybeSingle()
-      const { data: listData, error: listError } = await supabase
-        .from("reading_lists")
-        .select("id, title, user_id, is_public, created_at")
-        .eq("id", listId)
-        .maybeSingle();
-
-      if (listError) {
-        console.error("Error fetching reading list:", listError.message);
+      // 1. Fetch reading list info via API route
+      const resList = await fetch(`/api/reading_lists/${listId}`);
+      if (!resList.ok) {
+        console.error("Error fetching reading list");
+        setLoading(false);
+        return;
       }
-
+      const listData = await resList.json();
       if (!listData) {
-        // If no data is returned, set loading to false and return
         setReadingList(null);
         setLoading(false);
         return;
       }
-
       setReadingList(listData);
 
-      // 1a. Fetch the owner's profile using listData.user_id
-      const { data: ownerData, error: ownerError } = await supabase
-        .from("profiles")
-        .select("display_name, profile_picture")
-        .eq("id", listData.user_id)
-        .single();
-
-      if (ownerError) {
-        console.error("Error fetching owner profile:", ownerError.message);
-      } else {
+      // 1a. Fetch the owner's profile using API route for profile
+      const resOwner = await fetch(`/api/profile/${listData.user_id}`);
+      if (resOwner.ok) {
+        const ownerData = await resOwner.json();
         setOwnerProfile(ownerData);
+      } else {
+        console.error("Error fetching owner profile");
       }
 
-      // 2. Fetch posts in this reading list
-      const { data: rlpData, error: postsError } = await supabase
-        .from("reading_list_posts")
-        .select("posts(*)")
-        .eq("reading_list_id", listId);
-      if (postsError) {
-        console.error(
-          "Error fetching posts from reading list:",
-          postsError.message,
-        );
-        setLoading(false);
-        return;
+      // 2. Fetch posts in this reading list via API route
+      const resPosts = await fetch(
+        `/api/reading_list_posts?reading_list_id=${listId}`,
+      );
+      if (resPosts.ok) {
+        const postsData = await resPosts.json();
+        // postsData is expected to be an array of post objects including profile info.
+        // If comment counts are not provided, you can add extra processing here.
+        setPosts(postsData);
+      } else {
+        console.error("Error fetching posts from reading list");
       }
-      const rawPosts = rlpData.map((item) => item.posts);
-      const postsWithProfiles = await mergeProfilesWithPosts(rawPosts);
-      const postIds = postsWithProfiles.map((p) => p.id);
-      const commentCounts = await fetchCommentCounts(postIds);
-      const finalPosts = postsWithProfiles.map((post) => ({
-        ...post,
-        comment_count: commentCounts[post.id] || 0,
-      }));
-      setPosts(finalPosts);
       setLoading(false);
     }
-
     fetchReadingListData();
   }, [listId]);
 
+  // Toggle public status using API route (PUT to /api/reading_list/[id])
   const togglePublicStatus = async () => {
     const newStatus = !readingList.is_public;
-    const { error } = await supabase
-      .from("reading_lists")
-      .update({ is_public: newStatus })
-      .eq("id", readingList.id);
-    if (error) {
-      console.error("Error updating public status:", error.message);
+    const res = await fetch(`/api/reading_lists/${readingList.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ is_public: newStatus }),
+    });
+    if (!res.ok) {
+      console.error("Error updating public status");
     } else {
       setReadingList((prev) => ({ ...prev, is_public: newStatus }));
     }
     setDropdownOpen(false);
   };
 
+  // Copy current URL to clipboard
   const handleCopyURL = async () => {
     try {
       await navigator.clipboard.writeText(window.location.href);
@@ -183,14 +128,18 @@ export default function ReadingListDetailPage() {
     setDropdownOpen(false);
   };
 
+  // Remove a post from the reading list via API route (DELETE to /api/reading_list_posts)
   const handleRemovePost = async (postId) => {
-    const { error } = await supabase
-      .from("reading_list_posts")
-      .delete()
-      .eq("reading_list_id", readingList.id)
-      .eq("post_id", postId);
-    if (error) {
-      console.error("Error removing post:", error.message);
+    const res = await fetch(`/api/reading_list_posts`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        reading_list_id: readingList.id,
+        post_id: postId,
+      }),
+    });
+    if (!res.ok) {
+      console.error("Error removing post from reading list");
     } else {
       setPosts((prev) => prev.filter((p) => p.id !== postId));
     }
@@ -201,12 +150,12 @@ export default function ReadingListDetailPage() {
   if (!readingList)
     return (
       <div className="flex flex-col items-center justify-center h-screen">
-        <p className="text-center text-3xl text-bold mb-4">
+        <p className="text-center text-3xl font-bold mb-4">
           Reading list not found. User may have set their list to private.
         </p>
         <Image
           src="/images/nodata.png"
-          alt="Profile Picture"
+          alt="No data"
           width={200}
           height={300}
           className="rounded-full object-cover"
@@ -214,7 +163,6 @@ export default function ReadingListDetailPage() {
       </div>
     );
 
-  // Use the owner's profile (if available) for display
   const displayName = ownerProfile?.display_name || "Anonymous";
   const profilePic = ownerProfile?.profile_picture || "/images/hero.png";
 
@@ -254,8 +202,8 @@ export default function ReadingListDetailPage() {
                 <div className="relative" ref={dropdownRef}>
                   <button
                     onClick={(e) => {
-                      e.preventDefault(); // Prevent the link's default action
-                      e.stopPropagation(); // Stop event bubbling
+                      e.preventDefault();
+                      e.stopPropagation();
                       setDropdownOpen((prev) => !prev);
                     }}
                     className="px-3 py-1"
@@ -339,7 +287,7 @@ export default function ReadingListDetailPage() {
                     </span>
                     <div className="flex items-center space-x-1">
                       <FaCommentAlt />
-                      <span>{post.comment_count}</span>
+                      <span>{post.comment_count || 0}</span>
                     </div>
                     <PostLikes postId={post.id} />
                   </div>

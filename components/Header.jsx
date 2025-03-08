@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import AuthModal from "@/components/AuthModal";
-import { supabase } from "@/lib/supabaseClient";
 import NotificationsButton from "@/components/NotificationsButton";
 import Link from "next/link";
 
@@ -31,38 +30,28 @@ export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const toggleMobileMenu = () => setMobileMenuOpen(!mobileMenuOpen);
 
-  // Fetch the profile to set isAdmin and profilePicture
+  // Fetch the profile data using our API route.
   useEffect(() => {
     async function fetchProfileData() {
       if (!user) return;
 
       try {
-        const userId = user.id;
-        const { data, error } = await supabase
-          .from("profiles")
-          .select("is_admin, profile_picture")
-          .eq("id", userId);
-
-        if (error) {
-          console.error("Error fetching profile:", error);
+        const res = await fetch(`/api/profile/${user.id}`);
+        const data = await res.json();
+        if (data.error) {
+          console.error("Error fetching profile:", data.error);
           return;
         }
-
-        if (data && data.length > 0) {
-          setIsAdmin(!!data[0].is_admin);
-          setProfilePicture(data[0].profile_picture);
-        } else {
-          setIsAdmin(false);
-        }
+        setIsAdmin(!!data.is_admin);
+        setProfilePicture(data.profile_picture);
       } catch (err) {
         console.error("Exception when fetching profile:", err);
       }
     }
-
     fetchProfileData();
   }, [user]);
 
-  // Handle search input changes: search both posts and people
+  // Handle search input changes: use the API route to search posts and people.
   const handleSearchChange = async (e) => {
     const query = e.target.value;
     setSearchText(query);
@@ -74,32 +63,11 @@ export default function Header() {
     }
 
     try {
-      // Query posts matching the title
-      const { data: posts, error: postsError } = await supabase
-        .from("posts")
-        .select("id, title, user_id, created_at")
-        .ilike("title", `%${query}%`)
-        .order("created_at", { ascending: false })
-        .limit(5);
-
-      if (postsError) {
-        console.error("Search posts error:", postsError);
-      }
-
-      // Query people matching the display name
-      const { data: people, error: peopleError } = await supabase
-        .from("profiles")
-        .select("id, display_name, email, profile_picture")
-        .ilike("display_name", `%${query}%`)
-        .limit(5);
-
-      if (peopleError) {
-        console.error("Search people error:", peopleError);
-      }
-
+      const res = await fetch(`/api/search?query=${encodeURIComponent(query)}`);
+      const data = await res.json();
       setSearchResults({
-        posts: posts || [],
-        people: people || [],
+        posts: data.posts || [],
+        people: data.people || [],
       });
       setShowResults(true);
     } catch (err) {
@@ -107,7 +75,7 @@ export default function Header() {
     }
   };
 
-  // Close search results when clicking outside
+  // Close search results when clicking outside.
   useEffect(() => {
     function handleClickOutside(event) {
       if (searchRef.current && !searchRef.current.contains(event.target)) {
@@ -118,7 +86,7 @@ export default function Header() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Load jQuery and the Jira Issue Collector script
+  // Load jQuery and the Jira Issue Collector script.
   useEffect(() => {
     if (typeof window !== "undefined" && !window.jQuery) {
       const jqueryScript = document.createElement("script");
@@ -132,7 +100,6 @@ export default function Header() {
     }
 
     function loadJiraCollector() {
-      // Load the Jira Issue Collector script using jQuery.ajax
       jQuery.ajax({
         url: "https://danblock97.atlassian.net/s/d41d8cd98f00b204e9800998ecf8427e-T/g2slup/b/9/b0105d975e9e59f24a3230a22972a71a/_/download/batch/com.atlassian.jira.collector.plugin.jira-issue-collector-plugin:issuecollector-embededjs/com.atlassian.jira.collector.plugin.jira-issue-collector-plugin:issuecollector-embededjs.js?locale=en-GB&collectorId=dce956ff",
         type: "get",
@@ -308,7 +275,7 @@ export default function Header() {
             Report a Bug
           </a>
 
-          {/* Notifications Button with improved styling */}
+          {/* Notifications Button */}
           <div className="relative">
             <NotificationsButton
               userId={user.id}
@@ -335,7 +302,6 @@ export default function Header() {
                     onClick={() => setDropdownOpen(false)}
                     className="flex items-center gap-2 block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
-                    {/* User Icon */}
                     <svg
                       className="w-4 h-4"
                       fill="none"
@@ -363,7 +329,6 @@ export default function Header() {
                       onClick={() => setDropdownOpen(false)}
                       className="flex items-center gap-2 block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     >
-                      {/* Shield Icon for Admin */}
                       <svg
                         className="w-4 h-4"
                         fill="none"
@@ -387,7 +352,6 @@ export default function Header() {
                     onClick={() => setDropdownOpen(false)}
                     className="flex items-center gap-2 block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
-                    {/* List Icon */}
                     <svg
                       className="w-4 h-4"
                       fill="none"
@@ -412,7 +376,6 @@ export default function Header() {
                   }}
                   className="flex items-center gap-2 block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                 >
-                  {/* Logout Icon */}
                   <svg
                     className="w-4 h-4"
                     fill="none"
@@ -487,7 +450,6 @@ export default function Header() {
           <a href="#" className="hover:underline text-md font-medium">
             Membership
           </a>
-          {/* Write link with Pencil Icon */}
           <a
             href="#"
             className="flex items-center hover:underline text-md font-medium"

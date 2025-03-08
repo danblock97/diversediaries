@@ -6,10 +6,9 @@ import Image from "next/image";
 import { FaCommentAlt } from "react-icons/fa";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/lib/supabaseClient";
 import PostLikes from "@/components/PostLikes";
 import LoadingAnimation from "@/components/LoadingAnimation";
-import AddToReadingListButton from "@/components/AddToReadingListButton"; // Imported here
+import AddToReadingListButton from "@/components/AddToReadingListButton";
 
 // -------------------------
 // CategoriesNav Component
@@ -19,10 +18,12 @@ function CategoriesNav({ selectedCategory, onSelect }) {
 
   useEffect(() => {
     async function fetchCategories() {
-      const { data, error } = await supabase.from("categories").select("*");
-      if (!error) {
-        setCategories(data);
-      } else {
+      try {
+        const res = await fetch("/api/categories");
+        const data = await res.json();
+        // Ensure data is an array
+        setCategories(Array.isArray(data) ? data : []);
+      } catch (error) {
         console.error("Error fetching categories:", error.message);
       }
     }
@@ -51,45 +52,8 @@ function CategoriesNav({ selectedCategory, onSelect }) {
 }
 
 // -------------------------
-// Helper Functions
+// Client-side Helper Functions
 // -------------------------
-async function mergeProfilesWithPosts(postsData) {
-  const userIds = [...new Set(postsData.map((post) => post.user_id))];
-  const { data: profilesData, error: profilesError } = await supabase
-    .from("profiles")
-    .select("id, display_name, bio, profile_picture, followers")
-    .in("id", userIds);
-  if (profilesError) {
-    console.error("Error fetching profiles:", profilesError.message);
-    return postsData.map((post) => ({ ...post, profile: null }));
-  }
-  const profilesById = {};
-  profilesData.forEach((profile) => {
-    profilesById[profile.id] = profile;
-  });
-  return postsData.map((post) => ({
-    ...post,
-    profile: profilesById[post.user_id] || null,
-  }));
-}
-
-async function fetchCommentCounts(postIds) {
-  const counts = {};
-  for (const id of postIds) {
-    const { count, error } = await supabase
-      .from("comments")
-      .select("*", { count: "exact", head: true })
-      .eq("post_id", id);
-    if (error) {
-      console.error("Error fetching comment count for post", id, error.message);
-      counts[id] = 0;
-    } else {
-      counts[id] = count || 0;
-    }
-  }
-  return counts;
-}
-
 function extractFirstImage(content) {
   if (!content) return null;
   const div = document.createElement("div");
@@ -115,7 +79,7 @@ function calculateReadTime(content) {
 }
 
 // -------------------------
-// AuthorTooltip Component (as before)
+// AuthorTooltip Component
 // -------------------------
 function AuthorTooltip({ profile }) {
   const router = useRouter();
@@ -158,12 +122,17 @@ function AuthorTooltip({ profile }) {
     } else {
       updatedFollowers = [...(profile.followers || []), user.id];
     }
-    const { error } = await supabase
-      .from("profiles")
-      .update({ followers: updatedFollowers })
-      .eq("id", profile.id);
-    if (!error) setIsFollowing(!isFollowing);
-    else console.error("Error updating followers:", error.message);
+    try {
+      const res = await fetch(`/api/profile/${profile.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ followers: updatedFollowers }),
+      });
+      if (!res.ok) throw new Error("Failed to update followers");
+      setIsFollowing(!isFollowing);
+    } catch (error) {
+      console.error("Error updating followers:", error.message);
+    }
   };
 
   return (
@@ -218,7 +187,7 @@ function AuthorTooltip({ profile }) {
 }
 
 // -------------------------
-// PostsFeed Component with Adjusted Reading List Button Placement
+// PostsFeed Component
 // -------------------------
 function PostsFeed({ selectedCategory }) {
   const [posts, setPosts] = useState([]);
@@ -237,41 +206,24 @@ function PostsFeed({ selectedCategory }) {
   const fetchPosts = useCallback(async () => {
     if (fetchInProgress.current || !hasMore) return;
     fetchInProgress.current = true;
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-
-    let query = supabase
-      .from("posts")
-      .select("*, post_categories!inner(category_id)")
-      .order("created_at", { ascending: false })
-      .order("id", { ascending: false })
-      .range(from, to);
-
-    if (selectedCategory) {
-      query = query.eq("post_categories.category_id", selectedCategory);
-    }
-
-    const { data: postsData, error } = await query;
-    if (error) {
-      console.error("Error fetching posts:", error.message);
-    } else if (postsData) {
-      const postsWithProfile = await mergeProfilesWithPosts(postsData);
-      const postIds = postsWithProfile.map((p) => p.id);
-      const commentCounts = await fetchCommentCounts(postIds);
-      const postsWithData = postsWithProfile.map((post) => ({
-        ...post,
-        comment_count: commentCounts[post.id] || 0,
-      }));
+    const query = `/api/posts/feed?category=${selectedCategory || ""}&page=${page}`;
+    try {
+      const res = await fetch(query);
+      const postsData = await res.json();
+      // Ensure postsData is an array
+      const newPosts = Array.isArray(postsData) ? postsData : [];
       setPosts((prev) => {
         const existingIds = new Set(prev.map((p) => p.id));
-        const newPosts = postsWithData.filter((p) => !existingIds.has(p.id));
-        return [...prev, ...newPosts];
+        const filtered = newPosts.filter((p) => !existingIds.has(p.id));
+        return [...prev, ...filtered];
       });
-      if (postsData.length < pageSize) setHasMore(false);
+      if (newPosts.length < pageSize) setHasMore(false);
       else setPage((prev) => prev + 1);
+    } catch (error) {
+      console.error("Error fetching posts:", error.message);
     }
     fetchInProgress.current = false;
-  }, [page, pageSize, selectedCategory, hasMore]);
+  }, [page, selectedCategory, hasMore]);
 
   const sentinelRef = useCallback(
     (node) => {
@@ -332,43 +284,37 @@ function PostsFeed({ selectedCategory }) {
           </Link>
         );
       })}
-      {/* Sentinel for infinite scroll */}
       <div ref={sentinelRef} />
     </div>
   );
 }
 
 // -------------------------
-// DevPicks Component (unchanged)
+// DevPicks Component
 // -------------------------
 function DevPicks() {
   const [devPosts, setDevPosts] = useState([]);
-  const fetchInProgress = useRef(false);
 
   useEffect(() => {
-    async function fetchRandomPosts() {
-      if (fetchInProgress.current) return;
-      fetchInProgress.current = true;
-
-      const { data: postsData, error } = await supabase
-        .from("posts")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .order("id", { ascending: false })
-        .limit(3);
-
-      if (error) {
+    async function fetchDevPosts() {
+      try {
+        // Note: using "/api/posts/dev-picks" (with a hyphen) to avoid dynamic route conflicts
+        const res = await fetch("/api/posts/dev-picks");
+        const postsData = await res.json();
+        if (postsData.error) {
+          console.error("Error fetching dev picks:", postsData.error);
+          setDevPosts([]);
+        } else if (Array.isArray(postsData)) {
+          setDevPosts(postsData);
+        } else {
+          setDevPosts([]);
+        }
+      } catch (error) {
         console.error("Error fetching dev picks:", error.message);
-      } else if (postsData) {
-        const postsWithProfile = await mergeProfilesWithPosts(postsData);
-        const uniquePosts = Array.from(
-          new Map(postsWithProfile.map((post) => [post.id, post])).values(),
-        );
-        setDevPosts(uniquePosts);
+        setDevPosts([]);
       }
-      fetchInProgress.current = false;
     }
-    fetchRandomPosts();
+    fetchDevPosts();
   }, []);
 
   return (
@@ -400,7 +346,7 @@ function DevPicks() {
 }
 
 // -------------------------
-// SuggestedAccounts Component (unchanged)
+// SuggestedAccounts Component
 // -------------------------
 function SuggestedAccounts() {
   const { user } = useAuth();
@@ -408,21 +354,26 @@ function SuggestedAccounts() {
 
   useEffect(() => {
     async function fetchSuggestedAccounts() {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, display_name, email, profile_picture, followers")
-        .neq("id", user?.id)
-        .limit(5);
-      if (!error) {
-        setAccounts(data);
-      } else {
+      if (!user) return;
+      try {
+        const res = await fetch(`/api/profile/suggested?userId=${user.id}`);
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          const data = await res.json();
+          setAccounts(Array.isArray(data) ? data : []);
+        } else {
+          console.error("Expected JSON response but got HTML");
+          setAccounts([]);
+        }
+      } catch (error) {
         console.error("Error fetching suggested accounts:", error.message);
+        setAccounts([]);
       }
     }
     fetchSuggestedAccounts();
   }, [user]);
 
-  if (accounts.length === 0) return null;
+  if (!accounts || accounts.length === 0) return null;
 
   return (
     <div className="p-4">
@@ -474,7 +425,7 @@ function SuggestedAccounts() {
 }
 
 // -------------------------
-// HeroSection Component (for unauthenticated users)
+// HeroSection Component
 // -------------------------
 function HeroSection() {
   return (

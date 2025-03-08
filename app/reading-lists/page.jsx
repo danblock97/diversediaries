@@ -12,7 +12,7 @@ export default function ReadingListsPage() {
   const { user, loading } = useAuth();
 
   const { data: readingLists, error } = useSWR(
-    user ? `http://localhost:3000/api/reading_lists?userId=${user.id}` : null,
+    user ? `/api/reading_lists?userId=${user.id}` : null,
     fetcher,
     {
       dedupingInterval: 60000, // Cache for 60 seconds
@@ -20,7 +20,7 @@ export default function ReadingListsPage() {
   );
 
   const { data: profileData } = useSWR(
-    user ? `http://localhost:3000/api/profile/${user.id}` : null,
+    user ? `/api/profile/${user.id}` : null,
     fetcher,
     {
       dedupingInterval: 60000, // Cache for 60 seconds

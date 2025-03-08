@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/lib/supabaseClient";
 
 export default function FeedbackModal({
   isOpen,
@@ -31,33 +30,32 @@ export default function FeedbackModal({
     setError("");
 
     try {
-      // Fetch the user's profile info from the profiles table
-      const { data: profile, error: profileError } = await supabase
-        .from("profiles")
-        .select("display_name, email")
-        .eq("id", user.id)
-        .single();
-
-      if (profileError || !profile) {
+      // Retrieve profile information via your profile API route.
+      const profileRes = await fetch(`/api/profile/${user.id}`);
+      if (!profileRes.ok) {
         throw new Error("Failed to retrieve profile information.");
       }
+      const profile = await profileRes.json();
 
       let fullFeedback = feedback;
       if (categoryName.trim()) {
         fullFeedback = `Category Name: ${categoryName}\nWhy it's useful: ${feedback}`;
       }
 
-      // Insert feedback using the profile's display_name and email
-      const { error } = await supabase.from("feedback").insert([
-        {
+      // Submit feedback via your feedback API route.
+      const feedbackRes = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           feedback: fullFeedback,
           user_id: user.id,
           email: profile.email || null,
           display_name: profile.display_name || null,
-        },
-      ]);
-      if (error) {
-        throw error;
+        }),
+      });
+      if (!feedbackRes.ok) {
+        const errData = await feedbackRes.json();
+        throw new Error(errData.error || "Failed to submit feedback.");
       }
       onFeedbackSubmitted();
       onClose();

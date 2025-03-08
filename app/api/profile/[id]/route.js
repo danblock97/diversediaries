@@ -1,13 +1,13 @@
 import { supabase } from "@/lib/supabaseServerClient";
 
 export async function GET(_req, { params }) {
-  const awaitedParams = await params;
-  const { id } = awaitedParams;
+  const { id } = params;
   const { data, error } = await supabase
     .from("profiles")
-    .select("display_name, email, bio, profile_picture, followers")
+    .select("is_admin, profile_picture")
     .eq("id", id)
     .single();
+
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
@@ -17,10 +17,10 @@ export async function GET(_req, { params }) {
 }
 
 export async function PUT(req, { params }) {
-  const awaitedParams = await params;
-  const { id } = awaitedParams;
+  const { id } = params;
   const body = await req.json();
   const updateData = {};
+
   if (body.display_name !== undefined)
     updateData.display_name = body.display_name;
   if (body.bio !== undefined) updateData.bio = body.bio;
@@ -31,6 +31,7 @@ export async function PUT(req, { params }) {
     .from("profiles")
     .update(updateData)
     .eq("id", id);
+
   if (error) {
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,

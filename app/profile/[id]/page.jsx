@@ -210,18 +210,66 @@ export default function PublicProfile() {
       <div>
         <h2 className="text-xl font-semibold mb-4">Public Reading Lists</h2>
         {readingLists.length > 0 ? (
-          readingLists.map((list) => (
-            <div key={list.id} className="border p-4 rounded mb-4">
-              <Link href={`/reading-lists/${list.id}`}>
-                <h3 className="text-lg font-bold hover:underline">
-                  {list.title}
-                </h3>
-              </Link>
-              {list.description && (
-                <p className="text-sm text-gray-600 mt-1">{list.description}</p>
-              )}
-            </div>
-          ))
+          <ul className="space-y-6">
+            {readingLists.map((list) => {
+              // Get first image from the first post in the list, if available.
+              const firstPost = list.reading_list_posts?.[0]?.posts;
+              const imageSrc = firstPost
+                ? extractFirstImage(firstPost.content)
+                : null;
+              const fallbackImage = "/images/hero.png";
+              const displayImage = imageSrc || fallbackImage;
+              return (
+                <li
+                  key={list.id}
+                  className="border border-gray-200 rounded p-4 flex items-center gap-4"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-24 h-24 relative flex-shrink-0">
+                      <Image
+                        src={displayImage}
+                        alt={list.title || "Reading List"}
+                        fill
+                        className="object-cover rounded"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <Link
+                        href={`/reading-lists/${list.id}`}
+                        className="text-xl font-semibold hover:underline"
+                      >
+                        {list.title}
+                      </Link>
+                      {list.description && (
+                        <p className="text-sm text-gray-600 mt-1">
+                          {list.description}
+                        </p>
+                      )}
+                      <div className="flex items-center mt-3">
+                        {profile?.profile_picture ? (
+                          <Image
+                            src={profile.profile_picture}
+                            alt={profile.display_name}
+                            width={32}
+                            height={32}
+                            className="rounded-full object-cover mr-2"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center mr-2">
+                            {profile?.display_name?.[0] || "A"}
+                          </div>
+                        )}
+                        <span className="text-sm text-gray-700 font-medium">
+                          {profile?.display_name || "Anonymous"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {/* Note: The delete button has been removed for public viewing */}
+                </li>
+              );
+            })}
+          </ul>
         ) : (
           <p>No public reading lists available.</p>
         )}

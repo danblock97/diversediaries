@@ -3,11 +3,15 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, useRouter, useParams } from "next/navigation";
 import Link from "next/link";
+import useSWR from "swr";
 import { useAuth } from "@/context/AuthContext";
 import FeedbackModal from "@/components/FeedbackModal";
 import LikeButton from "@/components/LikeButton";
 import Comment from "@/components/Comment";
 import LoadingAnimation from "@/components/LoadingAnimation";
+
+// A simple fetcher for SWR
+const fetcher = (url) => fetch(url).then((res) => res.json());
 
 export default function PostPage() {
   const { id } = useParams();
@@ -24,12 +28,6 @@ export default function PostPage() {
   const [reportLoading, setReportLoading] = useState(false);
   const [reportError, setReportError] = useState("");
 
-  // Post state
-  const [post, setPost] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [readTime, setReadTime] = useState("5 min");
-
   // Comments states
   const [comments, setComments] = useState([]);
   const [commentThreads, setCommentThreads] = useState({});
@@ -37,42 +35,27 @@ export default function PostPage() {
   const [commentLoading, setCommentLoading] = useState(false);
   const [replyingTo, setReplyingTo] = useState(null);
 
-  // Fetch post data via API route
-  useEffect(() => {
-    async function fetchPost() {
-      if (!id) return;
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/posts/${id}`);
-        const postData = await res.json();
-        if (!res.ok) {
-          setError(postData.error || "Failed to fetch post");
-          return;
-        }
-        setPost(postData);
-        setReadTime(postData.readTime);
-      } catch (err) {
-        setError(err.message || "Failed to load post");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchPost();
-  }, [id, user]);
+  // SWR hook to fetch the post data
+  const {
+    data: post,
+    error,
+    isLoading,
+  } = useSWR(id ? `/api/posts/${id}` : null, fetcher, {
+    revalidateOnFocus: false,
+  });
 
-  // Fetch comments via API route
-  const fetchComments = async () => {
-    if (!id) return;
-    try {
-      const res = await fetch(`/api/comments?post_id=${id}`);
-      const commentsData = await res.json();
-      if (!res.ok) {
-        console.error("Error fetching comments:", commentsData.error);
-        setComments([]);
-        setCommentThreads({});
-        return;
-      }
-      // Group comments into threads (same as before)
+  // SWR hook to fetch the comments for the post
+  const {
+    data: commentsData,
+    error: commentsError,
+    mutate: mutateComments,
+  } = useSWR(id ? `/api/comments?post_id=${id}` : null, fetcher, {
+    revalidateOnFocus: false,
+  });
+
+  // Process comments data into threads when it updates
+  useEffect(() => {
+    if (commentsData) {
       const threads = {};
       commentsData.forEach((comment) => {
         if (comment.parent_comment_id) {
@@ -88,21 +71,10 @@ export default function PostPage() {
       });
       setCommentThreads(threads);
       setComments(commentsData.filter((c) => !c.parent_comment_id));
-    } catch (err) {
-      console.error(
-        "Error fetching comments:",
-        err.message || JSON.stringify(err),
-      );
-      setComments([]);
-      setCommentThreads({});
     }
-  };
+  }, [commentsData]);
 
-  useEffect(() => {
-    fetchComments();
-  }, [id, user]);
-
-  // Report functionality using API route
+  // Report functionality using the API route
   const openReportModal = () => {
     if (!user) {
       alert("Please sign in to report this post.");
@@ -187,7 +159,7 @@ export default function PostPage() {
     );
   };
 
-  // Post comment via API route
+  // Post comment via the API route
   const handlePostComment = async () => {
     if (!newComment.trim()) return;
     if (!user) {
@@ -216,12 +188,11 @@ export default function PostPage() {
         return;
       }
 
-      // Notify post author if commenter is not the author
+      // Notify post author if commenter is not the post owner
       if (post?.user_id && post.user_id !== user.id) {
         const notificationMessage = `Someone commented on your post: "${newComment
           .trim()
           .slice(0, 250)}..."`;
-
         await fetch(`/api/notifications`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -236,13 +207,11 @@ export default function PostPage() {
 
       // Notify original commenter if replying
       if (replyingTo) {
-        // Find the parent comment from existing comments
         const parent = comments.find((c) => c.id === replyingTo);
         if (parent && parent.user_id !== user.id) {
           const replyMessage = `Someone replied to your comment: "${newComment
             .trim()
             .slice(0, 250)}..."`;
-
           await fetch(`/api/notifications`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -256,7 +225,8 @@ export default function PostPage() {
         }
       }
 
-      await fetchComments();
+      // Revalidate comments using SWR's mutate
+      mutateComments();
       setNewComment("");
       setReplyingTo(null);
     } catch (err) {
@@ -306,18 +276,20 @@ export default function PostPage() {
     return processed;
   };
 
-  if (loading) {
+  if (error) {
     return (
-      <div className="flex justify-center items-center min-h-[60vh] overflow-x-hidden">
-        <LoadingAnimation />
+      <div className="max-w-3xl mx-auto px-4 py-12">
+        <p className="text-lg text-red-600">
+          {error.message || "Failed to load post"}
+        </p>
       </div>
     );
   }
 
-  if (error || !post) {
+  if (isLoading || !post) {
     return (
-      <div className="max-w-3xl mx-auto px-4 py-12">
-        <p className="text-lg text-red-600">{error || "Post not found"}</p>
+      <div className="flex justify-center items-center min-h-[60vh] overflow-x-hidden">
+        <LoadingAnimation />
       </div>
     );
   }
@@ -369,7 +341,7 @@ export default function PostPage() {
                     })}
                   </span>
                   <span className="mx-1">•</span>
-                  <span>{readTime}</span>
+                  <span>{post.readTime}</span>
                 </div>
               </div>
             </div>

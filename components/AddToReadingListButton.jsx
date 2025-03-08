@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import { FiBookmark } from "react-icons/fi";
 
@@ -12,103 +11,119 @@ export default function AddToReadingListButton({ postId }) {
   const [readingLists, setReadingLists] = useState([]);
   const [showDropdown, setShowDropdown] = useState(false);
 
-  // Fetch the current user's reading lists
+  // Fetch the current user's reading lists from your API route.
   useEffect(() => {
     async function fetchLists() {
       if (!user) return;
-      const { data, error } = await supabase
-        .from("reading_lists")
-        .select("*")
-        .eq("user_id", user.id);
-      if (!error) {
+      try {
+        const res = await fetch(`/api/reading_lists?userId=${user.id}`);
+        if (!res.ok) {
+          throw new Error("Failed to fetch reading lists");
+        }
+        const data = await res.json();
         setReadingLists(data || []);
-      } else {
+      } catch (error) {
         console.error("Error fetching reading lists:", error.message);
       }
     }
     fetchLists();
   }, [user]);
 
-  // Check if this post is already in one of the user's reading lists
+  // Check if this post is already in one of the user's reading lists.
+  // For each list, we fetch its posts using the reading_list_posts API route.
   useEffect(() => {
     async function checkIfPostAdded() {
       if (!user || readingLists.length === 0) return;
-      const { data, error } = await supabase
-        .from("reading_list_posts")
-        .select("reading_list_id")
-        .eq("post_id", postId);
-      if (error) {
-        console.error("Error checking post in reading lists:", error.message);
-        return;
-      }
-      if (data && data.length > 0) {
-        const isAdded = data.some((row) =>
-          readingLists.some((list) => list.id === row.reading_list_id),
+      try {
+        const listPostsArrays = await Promise.all(
+          readingLists.map(async (list) => {
+            const res = await fetch(
+              `/api/reading_list_posts?reading_list_id=${list.id}`,
+            );
+            if (!res.ok) return [];
+            return res.json();
+          }),
         );
+        // Flatten the arrays and check if any post has an id matching postId.
+        const allPosts = listPostsArrays.flat();
+        const isAdded = allPosts.some((post) => post.id === postId);
         setAdded(isAdded);
+      } catch (error) {
+        console.error("Error checking post in reading lists:", error.message);
       }
     }
     checkIfPostAdded();
   }, [user, postId, readingLists]);
 
+  // Adds the given post to the specified reading list using your API route.
   const handleAddToList = async (listId) => {
     setLoading(true);
-    // Check if the post already exists in the selected reading list
-    const { data: exists, error: existsError } = await supabase
-      .from("reading_list_posts")
-      .select("id")
-      .eq("reading_list_id", listId)
-      .eq("post_id", postId)
-      .maybeSingle();
-    if (existsError) {
-      console.error(
-        "Error checking if post is in reading list:",
-        existsError.message,
+    try {
+      // First, fetch the posts in the selected list to check if the post already exists.
+      const resCheck = await fetch(
+        `/api/reading_list_posts?reading_list_id=${listId}`,
       );
-    }
-    if (exists) {
-      // Do nothing if the post is already added
+      if (resCheck.ok) {
+        const posts = await resCheck.json();
+        const exists = posts.some((post) => post.id === postId);
+        if (exists) {
+          setLoading(false);
+          setShowDropdown(false);
+          return;
+        }
+      }
+      // Add the post to the reading list via the API route.
+      const res = await fetch("/api/reading_list_posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reading_list_id: listId, post_id: postId }),
+      });
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.error || "Failed to add post to reading list");
+      }
+      setAdded(true);
+    } catch (error) {
+      console.error("Error adding post to reading list:", error.message);
+    } finally {
       setLoading(false);
       setShowDropdown(false);
-      return;
     }
-
-    // Insert if not already in the reading list
-    const { error } = await supabase
-      .from("reading_list_posts")
-      .insert([{ reading_list_id: listId, post_id: postId }]);
-    if (error) {
-      console.error("Error adding post to reading list:", error.message);
-    } else {
-      setAdded(true);
-    }
-    setLoading(false);
-    setShowDropdown(false);
   };
 
+  // Handle button click:
+  // • If no reading list exists, create a default one via POST to /api/reading_lists.
+  // • If one exists, add directly.
+  // • If multiple exist, open a dropdown for selection.
   const handleClick = async () => {
     if (!user) {
       console.error("User must be signed in to add posts to a reading list.");
       return;
     }
     if (readingLists.length === 0) {
-      // Create a default list if none exist.
-      const { data, error } = await supabase
-        .from("reading_lists")
-        .insert([{ user_id: user.id, title: "Reading List", is_public: false }])
-        .select("*")
-        .single();
-      if (error) {
+      try {
+        const res = await fetch("/api/reading_lists", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            user_id: user.id,
+            title: "Reading List",
+            is_public: false,
+          }),
+        });
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error || "Failed to create reading list");
+        }
+        const data = await res.json();
+        setReadingLists([data]);
+        handleAddToList(data.id);
+      } catch (error) {
         console.error("Error creating reading list:", error.message);
-        return;
       }
-      setReadingLists([data]);
-      handleAddToList(data.id);
     } else if (readingLists.length === 1) {
-      // Only one exists, add directly.
       handleAddToList(readingLists[0].id);
     } else {
-      // More than one exists, toggle dropdown for selection.
       setShowDropdown(!showDropdown);
     }
   };

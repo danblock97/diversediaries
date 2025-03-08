@@ -35,3 +35,14 @@ export async function PUT(req, { params }) {
   }
   return new Response(JSON.stringify({ success: true }), { status: 200 });
 }
+
+export async function DELETE(_req, { params }) {
+  const { id } = params;
+  const { error } = await supabase.from("reading_lists").delete().eq("id", id);
+  if (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+    });
+  }
+  return new Response(JSON.stringify({ success: true }), { status: 200 });
+}

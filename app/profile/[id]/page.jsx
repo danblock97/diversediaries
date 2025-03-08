@@ -4,7 +4,6 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import LoadingAnimation from "@/components/LoadingAnimation";
-import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 
 export default function PublicProfile() {
@@ -22,16 +21,15 @@ export default function PublicProfile() {
   // Fetch profile info
   useEffect(() => {
     async function fetchProfile() {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, display_name, bio, profile_picture, followers")
-        .eq("id", profileId)
-        .single();
-      if (!error) {
+      const res = await fetch(`/api/profile/${profileId}`);
+      if (res.ok) {
+        const data = await res.json();
         setProfile(data);
         if (user && data.followers && data.followers.includes(user.id)) {
           setIsFollowing(true);
         }
+      } else {
+        console.error("Error fetching profile");
       }
       setLoading(false);
     }
@@ -41,12 +39,12 @@ export default function PublicProfile() {
   // Fetch posts for the profile.
   useEffect(() => {
     async function fetchPosts() {
-      const { data, error } = await supabase
-        .from("posts")
-        .select("id, title, content, created_at")
-        .eq("user_id", profileId);
-      if (!error) {
+      const res = await fetch(`/api/posts?userId=${profileId}`);
+      if (res.ok) {
+        const data = await res.json();
         setPosts(data);
+      } else {
+        console.error("Error fetching posts");
       }
     }
     fetchPosts();
@@ -55,14 +53,12 @@ export default function PublicProfile() {
   // Fetch public reading lists for the profile.
   useEffect(() => {
     async function fetchReadingLists() {
-      const { data, error } = await supabase
-        .from("reading_lists")
-        .select("id, title, description, is_public, created_at")
-        .eq("user_id", profileId)
-        .eq("is_public", true)
-        .order("created_at", { ascending: false });
-      if (!error) {
+      const res = await fetch(`/api/reading_lists?userId=${profileId}`);
+      if (res.ok) {
+        const data = await res.json();
         setReadingLists(data);
+      } else {
+        console.error("Error fetching reading lists");
       }
     }
     fetchReadingLists();
@@ -80,15 +76,16 @@ export default function PublicProfile() {
     } else {
       updatedFollowers = [...(profile.followers || []), user.id];
     }
-    const { error } = await supabase
-      .from("profiles")
-      .update({ followers: updatedFollowers })
-      .eq("id", profileId);
-    if (!error) {
+    const res = await fetch(`/api/profiles/${profileId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ followers: updatedFollowers }),
+    });
+    if (res.ok) {
       setProfile((prev) => ({ ...prev, followers: updatedFollowers }));
       setIsFollowing(!isFollowing);
     } else {
-      console.error("Error updating followers:", error.message);
+      console.error("Error updating followers");
     }
   };
 
@@ -96,7 +93,7 @@ export default function PublicProfile() {
   if (!profile) return <p>Profile not found.</p>;
 
   return (
-    <div className="max-w-5xl mx-auto py-12">
+    <div className="max-w-5xl mx-auto py-12 h-screen">
       <div className="flex items-center space-x-4 mb-8">
         {profile.profile_picture ? (
           <img

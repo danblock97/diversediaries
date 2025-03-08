@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/context/AuthContext";
 import LoadingAnimation from "@/components/LoadingAnimation";
 
@@ -29,7 +28,7 @@ export default function AdminPage() {
   const [banModalOpen, setBanModalOpen] = useState(false);
   const [selectedUserToBan, setSelectedUserToBan] = useState(null);
 
-  // Admin check effect
+  // Admin check effect using API route /api/check-admin
   useEffect(() => {
     async function checkAdmin() {
       if (!loading) {
@@ -37,13 +36,13 @@ export default function AdminPage() {
           router.push("/");
           setAdminChecked(true);
         } else {
-          const { data, error } = await supabase
-            .from("profiles")
-            .select("is_admin")
-            .eq("id", user.id)
-            .maybeSingle();
-
-          if (error || !data || !data.is_admin) {
+          const res = await fetch("/api/check-admin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: user.id }),
+          });
+          const data = await res.json();
+          if (!data.isAdmin) {
             router.push("/");
           } else {
             setIsAdmin(true);
@@ -67,152 +66,49 @@ export default function AdminPage() {
   }, [adminChecked, isAdmin]);
 
   async function fetchOverviewData() {
-    const { count: postsCount } = await supabase
-      .from("posts")
-      .select("*", { count: "exact", head: true });
-    const { count: reportsCount } = await supabase
-      .from("reports")
-      .select("*", { count: "exact", head: true });
-    const { count: activeUsersCount } = await supabase
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .eq("is_banned", false);
-
-    setTotalPosts(postsCount || 0);
-    setReportedItems(reportsCount || 0);
-    setActiveUsers(activeUsersCount || 0);
+    const res = await fetch("/api/admin/overview");
+    const data = await res.json();
+    setTotalPosts(data.totalPosts || 0);
+    setReportedItems(data.reportedItems || 0);
+    setActiveUsers(data.activeUsers || 0);
   }
 
   async function fetchUsers() {
-    const { data, error } = await supabase.from("profiles").select("*");
-    if (error) {
-      console.error("Error fetching users:", error);
-      return;
-    }
-    const formattedUsers = data.map((u) => ({
-      id: u.id,
-      name: u.display_name || "No name",
-      email: u.email || "No email",
-      is_banned: u.is_banned ?? false,
-    }));
-    setUsers(formattedUsers);
+    const res = await fetch("/api/admin/users");
+    const data = await res.json();
+    setUsers(data);
   }
 
   async function fetchPosts() {
-    const { data: postsData, error: postsError } = await supabase
-      .from("posts")
-      .select("id, title, created_at, user_id");
-    if (postsError) {
-      console.error("Error fetching posts:", JSON.stringify(postsError));
-      return;
-    }
-    const userIds = [...new Set(postsData.map((post) => post.user_id))];
-    let authorsLookup = {};
-    if (userIds.length > 0) {
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, display_name")
-        .in("id", userIds);
-      if (profilesError) {
-        console.error(
-          "Error fetching post authors:",
-          JSON.stringify(profilesError),
-        );
-      } else {
-        profilesData.forEach((profile) => {
-          authorsLookup[profile.id] = profile.display_name;
-        });
-      }
-    }
-    const formattedPosts = postsData.map((post) => ({
-      id: post.id,
-      title: post.title,
-      author: authorsLookup[post.user_id] || "Unknown",
-      date: new Date(post.created_at).toLocaleDateString(),
-    }));
-    setPosts(formattedPosts);
+    const res = await fetch("/api/admin/posts");
+    const data = await res.json();
+    setPosts(data);
   }
 
   async function fetchComments() {
-    const { data: commentsData, error: commentsError } = await supabase
-      .from("comments")
-      .select("id, content, created_at, user_id")
-      .order("created_at", { ascending: false });
-    if (commentsError) {
-      console.error("Error fetching comments:", JSON.stringify(commentsError));
-      return;
-    }
-    const userIds = [
-      ...new Set(commentsData.map((comment) => comment.user_id)),
-    ];
-    let authorsLookup = {};
-    if (userIds.length > 0) {
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, display_name")
-        .in("id", userIds);
-      if (profilesError) {
-        console.error(
-          "Error fetching comment authors:",
-          JSON.stringify(profilesError),
-        );
-      } else {
-        profilesData.forEach((profile) => {
-          authorsLookup[profile.id] = profile.display_name;
-        });
-      }
-    }
-    const formattedComments = commentsData.map((comment) => ({
-      id: comment.id,
-      excerpt:
-        comment.content.length > 50
-          ? comment.content.slice(0, 50) + "..."
-          : comment.content,
-      author: authorsLookup[comment.user_id] || "Unknown",
-      date: new Date(comment.created_at).toLocaleDateString(),
-    }));
-    setComments(formattedComments);
+    const res = await fetch("/api/admin/comments");
+    const data = await res.json();
+    setComments(data);
   }
 
   async function fetchReports() {
-    const { data, error } = await supabase
-      .from("reports")
-      .select("id, post_id, reason, created_at, resolved, posts(title)")
-      .order("created_at", { ascending: false });
-    if (error) {
-      console.error("Error fetching reports:", JSON.stringify(error));
-      return;
-    }
-    const formattedReports = data.map((r) => ({
-      id: r.id,
-      title: r.posts ? r.posts.title : "Unknown",
-      reason: r.reason,
-      date: new Date(r.created_at).toLocaleDateString(),
-      resolved: r.resolved,
-    }));
-    setReports(formattedReports);
+    const res = await fetch("/api/admin/reports");
+    const data = await res.json();
+    setReports(data);
   }
 
   async function fetchFeedback() {
-    const { data, error } = await supabase
-      .from("feedback")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (error) {
-      console.error("Error fetching feedback:", JSON.stringify(error));
-      return;
-    }
+    const res = await fetch("/api/admin/feedback");
+    const data = await res.json();
     setFeedback(data);
   }
 
-  // New function to remove a comment
   async function handleRemoveComment(comment) {
-    const { error } = await supabase
-      .from("comments")
-      .delete()
-      .eq("id", comment.id);
-    if (error) {
-      console.error("Error removing comment:", error.message);
+    const res = await fetch(`/api/admin/comments/${comment.id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      console.error("Error removing comment");
     } else {
       fetchComments();
     }
@@ -226,12 +122,13 @@ export default function AdminPage() {
 
   const confirmBanUser = async () => {
     if (!selectedUserToBan) return;
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_banned: true })
-      .eq("id", selectedUserToBan.id);
-    if (error) {
-      console.error("Error banning user:", error.message);
+    const res = await fetch(`/api/admin/users/${selectedUserToBan.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ban" }),
+    });
+    if (!res.ok) {
+      console.error("Error banning user");
     } else {
       fetchUsers();
     }
@@ -240,51 +137,48 @@ export default function AdminPage() {
   };
 
   const handleUnbanUser = async (user) => {
-    const { error } = await supabase
-      .from("profiles")
-      .update({ is_banned: false })
-      .eq("id", user.id);
-    if (error) {
-      console.error("Error unbanning user:", error.message);
+    const res = await fetch(`/api/admin/users/${user.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "unban" }),
+    });
+    if (!res.ok) {
+      console.error("Error unbanning user");
     } else {
       fetchUsers();
     }
   };
 
-  // Functions for resolving and removing reports
   const handleResolveReport = async (report) => {
-    const { error } = await supabase
-      .from("reports")
-      .update({
-        resolved: true,
-        resolved_at: new Date().toISOString(),
-        resolved_by: user?.id || null,
-      })
-      .eq("id", report.id);
-    if (error) {
-      console.error("Error resolving report:", error.message);
+    const res = await fetch(`/api/admin/reports/${report.id}/resolve`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resolved_by: user?.id || null }),
+    });
+    if (!res.ok) {
+      console.error("Error resolving report");
     } else {
       fetchReports();
     }
   };
 
   const handleRemoveReport = async (report) => {
-    const { error } = await supabase
-      .from("reports")
-      .delete()
-      .eq("id", report.id);
-    if (error) {
-      console.error("Error removing report:", error.message);
+    const res = await fetch(`/api/admin/reports/${report.id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      console.error("Error removing report");
     } else {
       fetchReports();
     }
   };
 
-  // Function for removing a post
   const handleRemovePost = async (post) => {
-    const { error } = await supabase.from("posts").delete().eq("id", post.id);
-    if (error) {
-      console.error("Error removing post:", error.message);
+    const res = await fetch(`/api/admin/posts/${post.id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      console.error("Error removing post");
     } else {
       fetchPosts();
     }
@@ -540,7 +434,7 @@ function Posts({ data, onRemovePost }) {
   );
 }
 
-// Comments component with remove comment functionality
+// Comments component
 function Comments({ data, onRemoveComment }) {
   return (
     <div>

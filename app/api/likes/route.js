@@ -13,7 +13,7 @@ export async function GET(req) {
 
   const { data, error } = await supabase
     .from("likes")
-    .select("id")
+    .select("*")
     .eq("post_id", postId);
 
   if (error) {

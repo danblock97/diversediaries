@@ -188,7 +188,7 @@ export default function AdminPage() {
     return <LoadingAnimation />;
   }
   if (!isAdmin) {
-    return <div>Redirecting...</div>;
+    return <LoadingAnimation />;
   }
 
   return (

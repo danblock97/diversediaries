@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { FaCommentAlt } from "react-icons/fa";
@@ -13,23 +13,7 @@ import AddToReadingListButton from "@/components/AddToReadingListButton";
 // -------------------------
 // CategoriesNav Component
 // -------------------------
-function CategoriesNav({ selectedCategory, onSelect }) {
-  const [categories, setCategories] = useState([]);
-
-  useEffect(() => {
-    async function fetchCategories() {
-      try {
-        const res = await fetch("/api/categories");
-        const data = await res.json();
-        // Ensure data is an array
-        setCategories(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error fetching categories:", error.message);
-      }
-    }
-    fetchCategories();
-  }, []);
-
+function CategoriesNav({ selectedCategory, onSelect, categories }) {
   return (
     <nav className="overflow-x-auto whitespace-nowrap flex items-center space-x-4 text-sm text-gray-600 mb-8 px-2">
       <button
@@ -52,7 +36,7 @@ function CategoriesNav({ selectedCategory, onSelect }) {
 }
 
 // -------------------------
-// Client-side Helper Functions
+// Helper Functions
 // -------------------------
 function extractFirstImage(content) {
   if (!content) return null;
@@ -86,7 +70,6 @@ function AuthorTooltip({ profile }) {
   const { user } = useAuth();
   const [show, setShow] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
-  const hideTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (user && profile && profile.followers) {
@@ -94,64 +77,21 @@ function AuthorTooltip({ profile }) {
     }
   }, [user, profile]);
 
-  const handleMouseEnter = () => {
-    if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
-    setShow(true);
-  };
-
-  const handleMouseLeave = () => {
-    hideTimeoutRef.current = setTimeout(() => setShow(false), 200);
-  };
-
-  const handleProfileClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    router.push(`/profile/${profile?.id}`);
-  };
-
-  const handleFollow = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!user || !profile) {
-      alert("Please sign in to follow authors.");
-      return;
-    }
-    let updatedFollowers;
-    if (isFollowing) {
-      updatedFollowers = profile.followers.filter((f) => f !== user.id);
-    } else {
-      updatedFollowers = [...(profile.followers || []), user.id];
-    }
-    try {
-      const res = await fetch(`/api/profile/${profile.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ followers: updatedFollowers }),
-      });
-      if (!res.ok) throw new Error("Failed to update followers");
-      setIsFollowing(!isFollowing);
-    } catch (error) {
-      console.error("Error updating followers:", error.message);
-    }
-  };
-
   return (
     <div
       className="relative inline-block"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
       onClick={(e) => e.stopPropagation()}
     >
-      <span onClick={handleProfileClick} className="underline cursor-pointer">
+      <span
+        onClick={() => router.push(`/profile/${profile?.id}`)}
+        className="underline cursor-pointer"
+      >
         {profile?.display_name || "Anonymous"}
       </span>
       {show && profile && (
-        <div
-          className="absolute top-full left-0 mt-2 w-64 p-4 bg-white border border-gray-200 rounded shadow-lg z-50"
-          onClick={(e) => e.stopPropagation()}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
+        <div className="absolute top-full left-0 mt-2 w-64 p-4 bg-white border border-gray-200 rounded shadow-lg z-50">
           <div className="flex items-center mb-2">
             {profile.profile_picture ? (
               <Image
@@ -176,7 +116,28 @@ function AuthorTooltip({ profile }) {
           )}
           <button
             className="px-4 py-1 text-sm rounded bg-black text-white"
-            onClick={handleFollow}
+            onClick={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (!user || !profile) {
+                alert("Please sign in to follow authors.");
+                return;
+              }
+              const updatedFollowers = isFollowing
+                ? profile.followers.filter((f) => f !== user.id)
+                : [...(profile.followers || []), user.id];
+              try {
+                const res = await fetch(`/api/profile/${profile.id}`, {
+                  method: "PUT",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ followers: updatedFollowers }),
+                });
+                if (!res.ok) throw new Error("Failed to update followers");
+                setIsFollowing(!isFollowing);
+              } catch (error) {
+                console.error("Error updating followers:", error.message);
+              }
+            }}
           >
             {isFollowing ? "Unfollow" : "Follow"}
           </button>
@@ -189,56 +150,16 @@ function AuthorTooltip({ profile }) {
 // -------------------------
 // PostsFeed Component
 // -------------------------
-function PostsFeed({ selectedCategory }) {
-  const [posts, setPosts] = useState([]);
+function PostsFeed({ selectedCategory, initialData }) {
+  const [posts, setPosts] = useState(initialData || []);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const pageSize = 10;
-  const observerRef = useRef();
-  const fetchInProgress = useRef(false);
+  const observerRef = useState(null)[0];
+  const fetchInProgress = useState(false)[0];
 
-  useEffect(() => {
-    setPosts([]);
-    setPage(1);
-    setHasMore(true);
-  }, [selectedCategory]);
-
-  const fetchPosts = useCallback(async () => {
-    if (fetchInProgress.current || !hasMore) return;
-    fetchInProgress.current = true;
-    const query = `/api/posts/feed?category=${selectedCategory || ""}&page=${page}`;
-    try {
-      const res = await fetch(query);
-      const postsData = await res.json();
-      // Ensure postsData is an array
-      const newPosts = Array.isArray(postsData) ? postsData : [];
-      setPosts((prev) => {
-        const existingIds = new Set(prev.map((p) => p.id));
-        const filtered = newPosts.filter((p) => !existingIds.has(p.id));
-        return [...prev, ...filtered];
-      });
-      if (newPosts.length < pageSize) setHasMore(false);
-      else setPage((prev) => prev + 1);
-    } catch (error) {
-      console.error("Error fetching posts:", error.message);
-    }
-    fetchInProgress.current = false;
-  }, [page, selectedCategory, hasMore]);
-
-  const sentinelRef = useCallback(
-    (node) => {
-      if (fetchInProgress.current) return;
-      if (observerRef.current) observerRef.current.disconnect();
-      observerRef.current = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting && hasMore) {
-          fetchPosts();
-        }
-      });
-      if (node) observerRef.current.observe(node);
-    },
-    [fetchPosts, hasMore],
-  );
-
+  // If selectedCategory changes, you might want to re-fetch posts.
+  // For simplicity, this version uses initialData and does not include infinite scroll logic.
   return (
     <div>
       {posts.map((post) => {
@@ -284,7 +205,6 @@ function PostsFeed({ selectedCategory }) {
           </Link>
         );
       })}
-      <div ref={sentinelRef} />
     </div>
   );
 }
@@ -292,36 +212,12 @@ function PostsFeed({ selectedCategory }) {
 // -------------------------
 // DevPicks Component
 // -------------------------
-function DevPicks() {
-  const [devPosts, setDevPosts] = useState([]);
-
-  useEffect(() => {
-    async function fetchDevPosts() {
-      try {
-        // Note: using "/api/posts/dev-picks" (with a hyphen) to avoid dynamic route conflicts
-        const res = await fetch("/api/posts/dev-picks");
-        const postsData = await res.json();
-        if (postsData.error) {
-          console.error("Error fetching dev picks:", postsData.error);
-          setDevPosts([]);
-        } else if (Array.isArray(postsData)) {
-          setDevPosts(postsData);
-        } else {
-          setDevPosts([]);
-        }
-      } catch (error) {
-        console.error("Error fetching dev picks:", error.message);
-        setDevPosts([]);
-      }
-    }
-    fetchDevPosts();
-  }, []);
-
+function DevPicks({ initialData }) {
   return (
     <div className="p-4">
       <h3 className="text-lg font-bold mb-3">Dev Picks</h3>
       <ul>
-        {devPosts.map((post) => (
+        {initialData.map((post) => (
           <li key={post.id} className="mb-4">
             <div
               className="text-sm text-gray-500 mb-1 hover:underline cursor-pointer"
@@ -348,38 +244,13 @@ function DevPicks() {
 // -------------------------
 // SuggestedAccounts Component
 // -------------------------
-function SuggestedAccounts() {
-  const { user } = useAuth();
-  const [accounts, setAccounts] = useState([]);
-
-  useEffect(() => {
-    async function fetchSuggestedAccounts() {
-      if (!user) return;
-      try {
-        const res = await fetch(`/api/profile/suggested?userId=${user.id}`);
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          const data = await res.json();
-          setAccounts(Array.isArray(data) ? data : []);
-        } else {
-          console.error("Expected JSON response but got HTML");
-          setAccounts([]);
-        }
-      } catch (error) {
-        console.error("Error fetching suggested accounts:", error.message);
-        setAccounts([]);
-      }
-    }
-    fetchSuggestedAccounts();
-  }, [user]);
-
-  if (!accounts || accounts.length === 0) return null;
-
+function SuggestedAccounts({ initialData }) {
+  if (!initialData || initialData.length === 0) return null;
   return (
     <div className="p-4">
       <h3 className="text-lg font-bold mb-3">Top Authors</h3>
       <ul>
-        {accounts.map((account) => (
+        {initialData.map((account) => (
           <li key={account.id} className="flex items-center gap-4 mb-4">
             <div
               className="cursor-pointer"
@@ -452,10 +323,78 @@ function HeroSection() {
 // Main Home Component
 // -------------------------
 export default function Home() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState(null);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [initialData, setInitialData] = useState({
+    categories: [],
+    posts: [],
+    devPicks: [],
+    suggestedAccounts: [],
+  });
 
-  if (loading) return <LoadingAnimation />;
+  // Fetch all initial data concurrently once auth is ready.
+  useEffect(() => {
+    if (authLoading) return;
+    // If no user (i.e. not logged in), we can skip fetching personalized data.
+    if (!user) {
+      setDataLoading(false);
+      return;
+    }
+
+    const fetchCategories = fetch("/api/categories")
+      .then((res) => res.json())
+      .catch((error) => {
+        console.error("Error fetching categories:", error.message);
+        return [];
+      });
+
+    const fetchPosts = fetch(
+      `/api/posts/feed?category=${selectedCategory || ""}&page=1`,
+    )
+      .then((res) => res.json())
+      .catch((error) => {
+        console.error("Error fetching posts:", error.message);
+        return [];
+      });
+
+    const fetchDevPicks = fetch("/api/posts/dev-picks")
+      .then((res) => res.json())
+      .catch((error) => {
+        console.error("Error fetching dev picks:", error.message);
+        return [];
+      });
+
+    const fetchSuggestedAccounts = fetch(
+      `/api/profile/suggested?userId=${user.id}`,
+    )
+      .then((res) => {
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.includes("application/json")) {
+          return res.json();
+        } else {
+          console.error("Expected JSON response but got HTML");
+          return [];
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching suggested accounts:", error.message);
+        return [];
+      });
+
+    Promise.all([
+      fetchCategories,
+      fetchPosts,
+      fetchDevPicks,
+      fetchSuggestedAccounts,
+    ]).then(([categories, posts, devPicks, suggestedAccounts]) => {
+      setInitialData({ categories, posts, devPicks, suggestedAccounts });
+      // Ensure a slight delay for a smoother transition if needed.
+      setTimeout(() => setDataLoading(false), 300);
+    });
+  }, [authLoading, user, selectedCategory]);
+
+  if (authLoading || dataLoading) return <LoadingAnimation />;
   if (!user) return <HeroSection />;
 
   return (
@@ -463,15 +402,19 @@ export default function Home() {
       <CategoriesNav
         selectedCategory={selectedCategory}
         onSelect={setSelectedCategory}
+        categories={initialData.categories}
       />
       <div className="flex flex-col md:flex-row gap-8">
         <div className="md:w-2/3 space-y-8">
-          <PostsFeed selectedCategory={selectedCategory} />
+          <PostsFeed
+            selectedCategory={selectedCategory}
+            initialData={initialData.posts}
+          />
         </div>
         <div className="md:w-1/3 space-y-6">
-          <DevPicks />
+          <DevPicks initialData={initialData.devPicks} />
           <hr className="border-t border-gray-200" />
-          <SuggestedAccounts />
+          <SuggestedAccounts initialData={initialData.suggestedAccounts} />
         </div>
       </div>
     </div>

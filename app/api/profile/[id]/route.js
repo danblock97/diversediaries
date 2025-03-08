@@ -1,10 +1,11 @@
 import { supabase } from "@/lib/supabaseServerClient";
 
 export async function GET(_req, { params }) {
-  const { id } = params;
+  const { id } = await params;
+  // Include display_name in the select query.
   const { data, error } = await supabase
     .from("profiles")
-    .select("is_admin, profile_picture")
+    .select("id, display_name, profile_picture, is_admin")
     .eq("id", id)
     .single();
 

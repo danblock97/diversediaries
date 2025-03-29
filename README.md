@@ -1,49 +1,91 @@
-# 🚀 Diverse Diaries v1.2.0 - Fresh Updates & Fixes 🎉
+# Diverse Diaries
 
-We've been busy making your experience smoother and more enjoyable! Here's what's new:
+Diverse Diaries is a modern blogging platform where creative voices share unique experiences and inspire deeper understanding. The platform offers a clean, intuitive interface for both readers and writers, focused on content discovery and community engagement.
 
-## ✨ Improvements
+![Diverse Diaries Logo](public/images/hero.png)
 
-### Enhanced Profile Settings
+## What is Diverse Diaries?
 
-- The **"Update Profile"** button now beautifully spans the entire width of the input fields.
-- Your email is now conveniently displayed clearly as **read-only**.
-- The **follower count** is bigger and spaced nicely from your profile picture for better visibility.
-- **Posts on mobile** now look sleeker, with images neatly positioned on the right to optimize space.
+Diverse Diaries is a content-sharing platform designed to showcase varied perspectives and stories. Our mission is to create a space where people from all backgrounds can share their unique narratives, insights, and creative writing.
 
-### Homepage Posts Redesigned
+## Key Features
 
-- Enjoy a refined look of **homepage posts** on mobile, showcasing images prominently on the right for an elegant, clutter-free appearance.
+### For Readers
 
-### Richer Post Sharing
+- **Personalized Feed**: Discover content tailored to your interests
+- **Categories**: Browse posts by different topics and themes
+- **Reading Lists**: Save articles to read later
+- **Interactive Comments**: Engage with authors and other readers
+- **Follow System**: Keep up with your favorite writers
+- **Notifications**: Stay updated on new content and interactions
 
-- **Sharing your favorite posts just got better!** Post URLs now preview with the actual post image, enhancing visibility and appeal when shared.
+### For Writers
 
-### Public Profile Posts Refresh
+- **Rich Text Editor**: Create beautiful posts with formatting, images, and more
+- **Categories**: Organize your content by relevant topics
+- **Analytics**: View engagement metrics on your posts
+- **Profile Customization**: Share your bio and connect with your audience
+- **Reader Feedback**: Gain insights from comments and likes
 
-- Mobile visitors to **public profiles** will notice a cleaner, refined layout with images conveniently positioned on the right, providing a polished browsing experience.
+## How to Use Diverse Diaries
 
-## 🐞 Bug Fixes
+### Getting Started
 
-### Mobile 'Report a Bug' Restored
+1. **Sign Up**: Create an account using your email address (we use magic links for passwordless authentication)
+2. **Set Up Your Profile**: Add a profile picture, bio, and display name
+3. **Explore**: Discover posts by scrolling through your feed or browsing categories
 
-- Quickly **report bugs** again on mobile! The 'Report a Bug' feature is now functioning perfectly.
+### Reading & Engaging
 
-### Navbar Display Corrections
+- **Like Posts**: Show appreciation for content you enjoy
+- **Comment**: Share your thoughts and engage with the community
+- **Save to Reading List**: Store posts to read later
+- **Follow Authors**: Stay updated with your favorite writers
+- **Share**: Spread interesting stories with others
 
-- We fixed the **mobile navbar**: unauthenticated views no longer display irrelevant options, and authenticated users now have a handy hamburger menu for easy navigation.
+### Creating Content
 
-### Profile Settings Accuracy
+1. **Start Writing**: Click the "Write" button in the header
+2. **Craft Your Post**: Use the rich text editor to format your content
+3. **Add Images**: Enhance your posts with visual elements
+4. **Categorize**: Select relevant categories for better discovery
+5. **Publish**: Share your story with the Diverse Diaries community
 
-- Your **Email & Bio** now correctly appear in profile settings, pulling accurate details from our database to keep your profile updated.
+### Managing Your Profile
 
-### Profile Picture Editing on Mobile
+- **Dashboard**: Access your personal space with all your posts
+- **Edit Profile**: Update your bio, profile picture, and display name
+- **Reading Lists**: Create and manage collections of posts
+- **Notifications**: Stay informed about interactions with your content
 
-- You can now effortlessly change your **profile picture** directly from mobile—just tap to edit!
-- On desktop, we've improved the visibility of the **edit button** when hovering over your profile picture.
+## User Types
 
-### Notifications Dropdown Visibility
+### Regular Users
+Regular users can read, write, comment, and interact with content across the platform.
 
-- No more off-screen frustrations! **Mobile notifications dropdown** now stays within view, ensuring you never miss an alert.
+### Admin Users
+Administrators have additional capabilities to:
+- Moderate content and comments
+- Manage user accounts
+- Review reported content
+- Access analytics and platform data
 
-We hope you enjoy these improvements! 🌟 Thanks for using Diverse Diaries!
+## Accessibility
+
+Diverse Diaries is designed with accessibility in mind, featuring:
+- Responsive design for all device sizes
+- Keyboard navigation support
+- Readable typography and color contrasts
+- Alternative text for images
+
+## Privacy & Security
+
+We take your privacy seriously:
+- Magic link authentication for secure access
+- No password storage
+- Control over your public profile information
+- Ability to report inappropriate content
+
+---
+
+Diverse Diaries - Where your story matters
